@@ -102,3 +102,28 @@ if (lightbox && lightboxContent) {
 if (lightboxClose) {
   lightboxClose.addEventListener('click', closeLightbox);
 }
+
+
+const blogGrid = document.getElementById('blog-grid');
+const blogSearch = document.getElementById('blog-search');
+const blogCategoryFilter = document.getElementById('blog-category-filter');
+
+function filterBlogPosts() {
+  if (!blogGrid) return;
+  const cards = Array.from(blogGrid.querySelectorAll('.blog-card'));
+  const keyword = (blogSearch?.value || '').toLowerCase().trim();
+  const category = blogCategoryFilter?.value || '';
+
+  cards.forEach((card) => {
+    const matchesKeyword = card.dataset.title.includes(keyword);
+    const matchesCategory = !category || card.dataset.category === category;
+    card.style.display = matchesKeyword && matchesCategory ? 'block' : 'none';
+  });
+}
+
+[blogSearch, blogCategoryFilter].forEach((node) => {
+  if (node) {
+    node.addEventListener('input', filterBlogPosts);
+    node.addEventListener('change', filterBlogPosts);
+  }
+});

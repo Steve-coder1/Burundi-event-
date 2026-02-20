@@ -15,6 +15,7 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -70,6 +71,8 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     body = db.Column(db.Text, nullable=False)
+    language = db.Column(db.String(10), default="fr")
+    tags = db.Column(db.String(255), default="")
     published_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -165,6 +168,28 @@ def build_event_card(event: Event) -> dict:
     }
 
 
+def get_post_image(post_id: int) -> str | None:
+    media = (
+        Media.query.filter_by(linked_type="post", linked_id=post_id, media_type="image")
+        .order_by(Media.uploaded_at.desc())
+        .first()
+    )
+    return media.filename if media else None
+
+
+def build_post_card(post: Post) -> dict:
+    return {
+        "id": post.id,
+        "title": post.title,
+        "excerpt": f"{post.body[:160]}..." if len(post.body) > 160 else post.body,
+        "published": post.published_at.strftime("%Y-%m-%d"),
+        "category": post.categories[0].name if post.categories else "General",
+        "category_id": post.categories[0].id if post.categories else 0,
+        "image": get_post_image(post.id),
+        "tags": [tag.strip() for tag in (post.tags or "").split(",") if tag.strip()],
+    }
+
+
 @app.context_processor
 def inject_globals():
     return {
@@ -175,6 +200,20 @@ def inject_globals():
 @app.before_request
 def ensure_seed_data():
     db.create_all()
+    with db.engine.connect() as conn:
+        event_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(event)"))}
+        if "location" not in event_columns:
+            conn.execute(text("ALTER TABLE event ADD COLUMN location VARCHAR(200) DEFAULT 'TBD'"))
+        if "tags" not in event_columns:
+            conn.execute(text("ALTER TABLE event ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
+
+        post_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(post)"))}
+        if "language" not in post_columns:
+            conn.execute(text("ALTER TABLE post ADD COLUMN language VARCHAR(10) DEFAULT 'fr'"))
+        if "tags" not in post_columns:
+            conn.execute(text("ALTER TABLE post ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
+        conn.commit()
+
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     admin = AdminUser.query.filter_by(username="admin").first()
     if not admin:
@@ -211,7 +250,7 @@ def home():
     cards = [build_event_card(event) for event in events.items]
 
     featured_event = cards[0] if cards else None
-    blog_highlights = Post.query.order_by(Post.published_at.desc()).limit(3).all()
+    blog_highlights = [build_post_card(post) for post in Post.query.order_by(Post.published_at.desc()).limit(3).all()]
     event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
     return render_template(
         "home.html",
@@ -250,6 +289,59 @@ def set_language(lang: str):
     if lang in {"rn", "fr"}:
         session["public_lang"] = "rn" if lang == "rn" else "fr"
     return redirect(request.referrer or url_for("home"))
+
+
+@app.route("/blog")
+def blog_home():
+    increment_analytics("blog", 0.9)
+    keyword = request.args.get("keyword", "").strip().lower()
+    category_id = request.args.get("category", type=int)
+    page = request.args.get("page", 1, type=int)
+    per_page = 6
+    current_lang = session.get("public_lang", "fr")
+
+    query = Post.query.filter(Post.language == current_lang)
+    if keyword:
+        query = query.filter(Post.title.ilike(f"%{keyword}%"))
+    if category_id:
+        query = query.join(PostCategory, Post.id == PostCategory.post_id).filter(PostCategory.category_id == category_id)
+
+    posts = query.order_by(Post.published_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    post_cards = [build_post_card(post) for post in posts.items]
+    recent_posts = [build_post_card(post) for post in Post.query.filter(Post.language == current_lang).order_by(Post.published_at.desc()).limit(5).all()]
+    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
+    return render_template(
+        "blog.html",
+        posts=post_cards,
+        pagination=posts,
+        post_categories=post_categories,
+        recent_posts=recent_posts,
+    )
+
+
+@app.route("/blog/<int:post_id>")
+def blog_post_detail(post_id: int):
+    post = Post.query.get_or_404(post_id)
+    media_items = Media.query.filter_by(linked_type="post", linked_id=post.id).order_by(Media.uploaded_at.desc()).all()
+
+    related_query = Post.query.filter(Post.id != post.id, Post.language == post.language)
+    if post.categories:
+        category_ids = [category.id for category in post.categories]
+        related_query = related_query.join(PostCategory, Post.id == PostCategory.post_id).filter(
+            PostCategory.category_id.in_(category_ids)
+        )
+
+    related_posts = [build_post_card(item) for item in related_query.order_by(Post.published_at.desc()).limit(4).all()]
+    recent_posts = [build_post_card(item) for item in Post.query.filter(Post.language == post.language).order_by(Post.published_at.desc()).limit(5).all()]
+    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
+    return render_template(
+        "blog_detail.html",
+        post=post,
+        media_items=media_items,
+        related_posts=related_posts,
+        recent_posts=recent_posts,
+        post_categories=post_categories,
+    )
 
 
 @app.route("/admin/login", methods=["GET", "POST"])
@@ -425,6 +517,8 @@ def add_post():
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
         published_at = request.form.get("published_at", "")
+        language = request.form.get("language", "fr")
+        tags = request.form.get("tags", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not body:
@@ -434,6 +528,8 @@ def add_post():
         post = Post(
             title=title,
             body=body,
+            language=language,
+            tags=tags,
             published_at=datetime.strptime(published_at, "%Y-%m-%dT%H:%M") if published_at else datetime.utcnow(),
         )
 
@@ -458,6 +554,8 @@ def edit_post(post_id: int):
     if request.method == "POST":
         post.title = request.form.get("title", post.title)
         post.body = request.form.get("body", post.body)
+        post.language = request.form.get("language", post.language)
+        post.tags = request.form.get("tags", post.tags)
         published_at = request.form.get("published_at", "")
         if published_at:
             post.published_at = datetime.strptime(published_at, "%Y-%m-%dT%H:%M")

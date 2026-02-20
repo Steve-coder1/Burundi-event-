@@ -12,6 +12,8 @@ Flask web application with:
 - Event detail page with full metadata (location, date/time, category, tags)
 - Lightbox gallery and related-event suggestions
 - Blog highlights section and footer contact/social links
+- Dedicated Blog/News listing with search/filter, category widgets, and pagination
+- Individual blog post pages with media, tags, and related post recommendations
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -32,3 +34,5 @@ python app.py
 ## Routes
 - Public home: `http://localhost:5000/home`
 - Admin login: `http://localhost:5000/admin/login`
+
+- Public blog: `http://localhost:5000/blog`
