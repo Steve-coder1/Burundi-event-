@@ -6,8 +6,8 @@
     <h1>Find local events, stories, and community highlights in one place.</h1>
     <p>Start from this landing page, then explore upcoming events, local guides, blog stories, and media highlights.</p>
     <div class="landing-actions">
-      <a class="btn" href="{{ url_for('home') }}">Explore Events</a>
-      <a class="btn btn-secondary" href="{{ url_for('blog_home') }}">Read Blog</a>
+      <a class="btn" href="{{ url_for('home', lang=current_public_lang_segment) }}">Explore Events</a>
+      <a class="btn btn-secondary" href="{{ url_for('blog_home', lang=current_public_lang_segment) }}">Read Blog</a>
     </div>
   </div>
 </section>
@@ -16,7 +16,7 @@
   <h2>Upcoming Picks</h2>
   <div class="event-grid">
     {% for card in featured_events %}
-    <a href="{{ url_for('event_detail', event_id=card.id) }}" class="event-card">
+    <a href="{{ url_for('event_detail', event_id=card.id, lang=current_public_lang_segment) }}" class="event-card">
       {% if card.image %}
       <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
       {% else %}

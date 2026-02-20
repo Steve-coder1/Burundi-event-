@@ -1,7 +1,7 @@
 {% extends 'base_public.html' %}
 {% block content %}
 <article class="detail-wrap">
-  <a href="{{ url_for('home') }}">← Back to events</a>
+  <a href="{{ url_for('home', lang=current_public_lang_segment) }}">← Back to events</a>
 
   <section class="event-hero-detail" style="background-image: url('{{ url_for('static', filename='uploads/' + gallery[0].filename) if gallery and gallery[0].media_type == 'image' else '' }}');">
     <div class="hero-overlay">
@@ -48,7 +48,7 @@
     <h2>Related Events</h2>
     <div class="event-grid">
       {% for card in related_events %}
-      <a href="{{ url_for('event_detail', event_id=card.id) }}" class="event-card">
+      <a href="{{ url_for('event_detail', event_id=card.id, lang=current_public_lang_segment) }}" class="event-card">
         {% if card.image %}
         <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
         {% else %}

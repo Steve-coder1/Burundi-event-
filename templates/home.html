@@ -26,7 +26,7 @@
 
   <div class="event-grid" id="event-grid">
     {% for card in event_cards %}
-    <a href="{{ url_for('event_detail', event_id=card.id) }}" class="event-card" data-title="{{ card.title|lower }}" data-category="{{ card.category_id }}" data-date="{{ card.date }}">
+    <a href="{{ url_for('event_detail', event_id=card.id, lang=current_public_lang_segment) }}" class="event-card" data-title="{{ card.title|lower }}" data-category="{{ card.category_id }}" data-date="{{ card.date }}">
       {% if card.image %}
       <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
       {% else %}
@@ -42,9 +42,9 @@
   </div>
 
   <div class="pagination">
-    {% if pagination.has_prev %}<a href="{{ url_for('home', page=pagination.prev_num) }}">Previous</a>{% endif %}
+    {% if pagination.has_prev %}<a href="{{ url_for('home', lang=current_public_lang_segment, page=pagination.prev_num) }}">Previous</a>{% endif %}
     <span>Page {{ pagination.page }} / {{ pagination.pages or 1 }}</span>
-    {% if pagination.has_next %}<a href="{{ url_for('home', page=pagination.next_num) }}">Next</a>{% endif %}
+    {% if pagination.has_next %}<a href="{{ url_for('home', lang=current_public_lang_segment, page=pagination.next_num) }}">Next</a>{% endif %}
   </div>
 </section>
 
@@ -66,7 +66,7 @@
 <section id="media" class="card">
   <h2>Media</h2>
   <p>Explore highlights from community events and featured moments.</p>
-  <a class="btn" href="{{ url_for('media_gallery') }}">Open Gallery</a>
+  <a class="btn" href="{{ url_for('media_gallery', lang=current_public_lang_segment) }}">Open Gallery</a>
 </section>
 
 <section id="about" class="card">

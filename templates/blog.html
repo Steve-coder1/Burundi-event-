@@ -19,7 +19,7 @@
 
     <div class="blog-grid" id="blog-grid">
       {% for post in posts %}
-      <a href="{{ url_for('blog_post_detail', post_id=post.id) }}" class="event-card blog-card" data-title="{{ post.title|lower }}" data-category="{{ post.category_id }}">
+      <a href="{{ url_for('blog_post_detail', post_id=post.id, lang=current_public_lang_segment) }}" class="event-card blog-card" data-title="{{ post.title|lower }}" data-category="{{ post.category_id }}">
         {% if post.image %}
           <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}">
         {% else %}
@@ -38,9 +38,9 @@
     </div>
 
     <div class="pagination">
-      {% if pagination.has_prev %}<a href="{{ url_for('blog_home', page=pagination.prev_num, keyword=request.args.get('keyword', ''), category=request.args.get('category', '')) }}">Previous</a>{% endif %}
+      {% if pagination.has_prev %}<a href="{{ url_for('blog_home', lang=current_public_lang_segment, page=pagination.prev_num, keyword=request.args.get('keyword', ''), category=request.args.get('category', '')) }}">Previous</a>{% endif %}
       <span>Page {{ pagination.page }} / {{ pagination.pages or 1 }}</span>
-      {% if pagination.has_next %}<a href="{{ url_for('blog_home', page=pagination.next_num, keyword=request.args.get('keyword', ''), category=request.args.get('category', '')) }}">Next</a>{% endif %}
+      {% if pagination.has_next %}<a href="{{ url_for('blog_home', lang=current_public_lang_segment, page=pagination.next_num, keyword=request.args.get('keyword', ''), category=request.args.get('category', '')) }}">Next</a>{% endif %}
     </div>
   </section>
 
@@ -54,14 +54,14 @@
     <h3>Recent Posts</h3>
     <ul>
       {% for item in recent_posts %}
-      <li><a href="{{ url_for('blog_post_detail', post_id=item.id) }}">{{ item.title }}</a></li>
+      <li><a href="{{ url_for('blog_post_detail', post_id=item.id, lang=current_public_lang_segment) }}">{{ item.title }}</a></li>
       {% endfor %}
     </ul>
 
     <h3>Categories</h3>
     <ul>
       {% for category in post_categories %}
-      <li><a href="{{ url_for('blog_home', category=category.id) }}">{{ category.name }}</a></li>
+      <li><a href="{{ url_for('blog_home', lang=current_public_lang_segment, category=category.id) }}">{{ category.name }}</a></li>
       {% endfor %}
     </ul>
   </aside>

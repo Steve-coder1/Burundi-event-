@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ 'rn' if current_public_lang == 'rn' else 'fr' }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ title or 'Burundi Events' }}</title>
+  <meta property="og:locale" content="{{ 'rn_BI' if current_public_lang == 'rn' else 'fr_FR' }}">
+  <meta name="description" content="Community events and stories in Burundi">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body class="public-page">
@@ -11,25 +13,28 @@
     <div class="logo">Burundi Events</div>
     <button class="menu-toggle" id="menu-toggle">☰</button>
     <nav id="public-nav">
-      <a href="{{ url_for('index') }}">Home</a>
-      <a href="{{ url_for('home') }}#events-grid">Events</a>
-      <a href="{{ url_for('search_page') }}">Search</a>
-      <a href="{{ url_for('blog_home') }}">Blog</a>
-      <a href="{{ url_for('media_gallery') }}">Media</a>
-      <a href="{{ url_for('sponsors_page') }}">Sponsors</a>
-      <a href="{{ url_for('guides_page') }}">Guides</a>
-      <a href="{{ url_for('faqs_page') }}">FAQs</a>
-      <a href="{{ url_for('about_page') }}">About</a>
-      <a href="{{ url_for('contact_page') }}">Contact</a>
+      <a href="{{ url_for('index', lang=current_public_lang_segment) }}">Home</a>
+      <a href="{{ url_for('home', lang=current_public_lang_segment) }}#events-grid">Events</a>
+      <a href="{{ url_for('search_page', lang=current_public_lang_segment) }}">Search</a>
+      <a href="{{ url_for('blog_home', lang=current_public_lang_segment) }}">Blog</a>
+      <a href="{{ url_for('media_gallery', lang=current_public_lang_segment) }}">Media</a>
+      <a href="{{ url_for('sponsors_page', lang=current_public_lang_segment) }}">Sponsors</a>
+      <a href="{{ url_for('guides_page', lang=current_public_lang_segment) }}">Guides</a>
+      <a href="{{ url_for('faqs_page', lang=current_public_lang_segment) }}">FAQs</a>
+      <a href="{{ url_for('about_page', lang=current_public_lang_segment) }}">About</a>
+      <a href="{{ url_for('contact_page', lang=current_public_lang_segment) }}">Contact</a>
       <a href="{{ url_for('login') }}">Admin</a>
     </nav>
     <div class="lang-switch">
-      <a href="{{ url_for('set_language', lang='rn') }}" class="{{ 'active' if current_public_lang == 'rn' else '' }}">Kirundi</a>
+      <a href="{{ url_for('set_language', lang='kirundi') }}" class="{{ 'active' if current_public_lang == 'rn' else '' }}">Kirundi</a>
       <a href="{{ url_for('set_language', lang='fr') }}" class="{{ 'active' if current_public_lang == 'fr' else '' }}">Français</a>
     </div>
   </header>
 
   <main class="public-container">
+    {% if translation_fallback %}
+      <div class="alert warning">This page is shown in Kirundi because translation is not available in the selected language yet.</div>
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
       <div class="alerts">

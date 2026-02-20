@@ -36,11 +36,43 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///admin_dashboard.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+PRIMARY_PUBLIC_LANG = "rn"
+LANGUAGE_ALIASES = {
+    "rn": "rn",
+    "kirundi": "rn",
+    "fr": "fr",
+    "french": "fr",
+}
+LANGUAGE_SEGMENTS = {"rn": "kirundi", "fr": "fr"}
+
 db = SQLAlchemy(app)
 
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def normalize_public_lang(raw_lang: str | None) -> str:
+    if not raw_lang:
+        return PRIMARY_PUBLIC_LANG
+    return LANGUAGE_ALIASES.get(raw_lang.lower(), PRIMARY_PUBLIC_LANG)
+
+
+def get_public_lang(route_lang: str | None = None) -> str:
+    language = normalize_public_lang(route_lang or session.get("public_lang"))
+    session["public_lang"] = language
+    return language
+
+
+def get_lang_segment(language: str) -> str:
+    return LANGUAGE_SEGMENTS.get(language, LANGUAGE_SEGMENTS[PRIMARY_PUBLIC_LANG])
+
+
+def apply_language_fallback(query, model, language: str):
+    localized = query.filter(model.language == language)
+    if language != PRIMARY_PUBLIC_LANG and localized.count() == 0:
+        return query.filter(model.language == PRIMARY_PUBLIC_LANG), True
+    return localized, False
 
 
 class AdminUser(db.Model):
@@ -450,8 +482,11 @@ def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple
 
 @app.context_processor
 def inject_globals():
+    active_lang = get_public_lang()
     return {
-        "current_public_lang": session.get("public_lang", "fr"),
+        "current_public_lang": active_lang,
+        "current_public_lang_segment": get_lang_segment(active_lang),
+        "is_primary_lang": active_lang == PRIMARY_PUBLIC_LANG,
     }
 
 
@@ -553,30 +588,34 @@ def ensure_seed_data():
 
 
 @app.route("/")
-def index():
-    current_lang = session.get("public_lang", "fr")
-    upcoming_events = (
-        Event.query.filter(Event.language == current_lang)
-        .order_by(Event.event_date.asc())
-        .limit(6)
-        .all()
-    )
+@app.route("/<lang>/")
+def index(lang: str | None = None):
+    current_lang = get_public_lang(lang)
+    event_query, event_fallback = apply_language_fallback(Event.query, Event, current_lang)
+    upcoming_events = event_query.order_by(Event.event_date.asc()).limit(6).all()
+    post_query, post_fallback = apply_language_fallback(Post.query, Post, current_lang)
+    recent_posts = [build_post_card(post) for post in post_query.order_by(Post.published_at.desc()).limit(3).all()]
     featured_cards = [build_event_card(event) for event in upcoming_events]
-    recent_posts = [build_post_card(post) for post in Post.query.order_by(Post.published_at.desc()).limit(3).all()]
-    return render_template("landing.html", featured_events=featured_cards, recent_posts=recent_posts)
+    return render_template(
+        "landing.html",
+        featured_events=featured_cards,
+        recent_posts=recent_posts,
+        translation_fallback=event_fallback or post_fallback,
+    )
 
 
 @app.route("/home")
-def home():
+@app.route("/<lang>/home")
+def home(lang: str | None = None):
     increment_analytics("home", 1.0)
     keyword = request.args.get("keyword", "").strip().lower()
     category_id = request.args.get("category", type=int)
     sort_order = request.args.get("sort", "asc")
     page = request.args.get("page", 1, type=int)
     per_page = 9
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
 
-    query = Event.query.filter(Event.language == current_lang)
+    query, events_fallback = apply_language_fallback(Event.query, Event, current_lang)
     if keyword:
         query = query.filter(Event.title.ilike(f"%{keyword}%"))
     if category_id:
@@ -588,7 +627,8 @@ def home():
     cards = [build_event_card(event) for event in events.items]
 
     featured_event = cards[0] if cards else None
-    blog_highlights = [build_post_card(post) for post in Post.query.order_by(Post.published_at.desc()).limit(3).all()]
+    post_query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
+    blog_highlights = [build_post_card(post) for post in post_query.order_by(Post.published_at.desc()).limit(3).all()]
     event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
     return render_template(
         "home.html",
@@ -597,16 +637,21 @@ def home():
         pagination=events,
         categories=event_categories,
         blog_highlights=blog_highlights,
+        translation_fallback=events_fallback or posts_fallback,
     )
 
 
 @app.route("/events")
-def public_events():
-    return redirect(url_for("home"))
+@app.route("/<lang>/events")
+def public_events(lang: str | None = None):
+    active_lang = get_public_lang(lang)
+    return redirect(url_for("home", lang=get_lang_segment(active_lang)))
 
 
 @app.route("/events/<int:event_id>")
-def event_detail(event_id: int):
+@app.route("/<lang>/events/<int:event_id>")
+def event_detail(event_id: int, lang: str | None = None):
+    current_lang = get_public_lang(lang)
     event = Event.query.get_or_404(event_id)
     log_tracking_event(
         content_type="event",
@@ -625,34 +670,36 @@ def event_detail(event_id: int):
     related_events = related_query.order_by(Event.event_date.asc()).limit(6).all()
     related_cards = [build_event_card(item) for item in related_events]
 
-    return render_template("event_detail.html", event=event, gallery=gallery, related_events=related_cards)
+    return render_template("event_detail.html", event=event, gallery=gallery, related_events=related_cards, translation_fallback=(event.language != current_lang and event.language == PRIMARY_PUBLIC_LANG))
 
 
 @app.route("/set-language/<lang>")
 def set_language(lang: str):
-    if lang in {"rn", "fr"}:
-        session["public_lang"] = "rn" if lang == "rn" else "fr"
-    return redirect(request.referrer or url_for("home"))
+    session["public_lang"] = normalize_public_lang(lang)
+    return redirect(request.referrer or url_for("home", lang=get_lang_segment(session["public_lang"])))
 
 
 @app.route("/search")
-def search_page():
+@app.route("/<lang>/search")
+def search_page(lang: str | None = None):
     increment_analytics("search", 0.7)
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
     event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
     post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
-    post_tags = sorted({tag.strip() for p in Post.query.filter(Post.language == current_lang).all() for tag in (p.tags or "").split(",") if tag.strip()})
+    post_query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
+    post_tags = sorted({tag.strip() for p in post_query.all() for tag in (p.tags or "").split(",") if tag.strip()})
     return render_template(
         "search.html",
         event_categories=event_categories,
         post_categories=post_categories,
         post_tags=post_tags,
+        translation_fallback=posts_fallback,
     )
 
 
 @app.route("/api/search")
 def api_search():
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang()
     rows = serialize_search_results(current_lang)
     filtered = filter_search_results(rows, request.args)
 
@@ -672,7 +719,7 @@ def api_search():
 
 @app.route("/api/autocomplete")
 def api_autocomplete():
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang()
     q = request.args.get("q", "").strip().lower()
     if not q:
         return jsonify({"suggestions": []})
@@ -708,14 +755,16 @@ def api_track():
 
 
 @app.route("/gallery")
-def media_gallery():
+@app.route("/<lang>/gallery")
+def media_gallery(lang: str | None = None):
     increment_analytics("media_gallery", 0.8)
     log_tracking_event(content_type="media", content_id="gallery", title="Public Media Gallery")
     selected_type = request.args.get("type", "")
     selected_linked_type = request.args.get("linked_type", "")
     selected_category = request.args.get("category", "")
     selected_event = request.args.get("event", type=int)
-    selected_language = session.get("public_lang", "fr")
+    selected_language = get_public_lang(lang)
+    translation_fallback = False
 
     media_items = Media.query.order_by(Media.uploaded_at.desc()).all()
     cards = [build_media_card(item) for item in media_items]
@@ -734,6 +783,11 @@ def media_gallery():
             continue
         filtered_cards.append(card)
 
+    if not filtered_cards and selected_language != PRIMARY_PUBLIC_LANG:
+        translation_fallback = True
+        filtered_cards = [card for card in cards if card["linked_language"] == PRIMARY_PUBLIC_LANG]
+        selected_language = PRIMARY_PUBLIC_LANG
+
     event_options = Event.query.filter(Event.language == selected_language).order_by(Event.event_date.desc()).limit(100).all()
     category_options = sorted({card["linked_category"] for card in cards if card["linked_category"]})
 
@@ -742,46 +796,50 @@ def media_gallery():
         media_cards=filtered_cards,
         event_options=event_options,
         category_options=category_options,
+        translation_fallback=translation_fallback,
     )
 
 
 @app.route("/sponsors")
-def sponsors_page():
+@app.route("/<lang>/sponsors")
+def sponsors_page(lang: str | None = None):
     increment_analytics("sponsors", 0.5)
     selected_type = request.args.get("type", "")
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
 
-    query = Sponsor.query.filter(Sponsor.language == current_lang)
+    query, translation_fallback = apply_language_fallback(Sponsor.query, Sponsor, current_lang)
     if selected_type:
         query = query.filter(Sponsor.sponsor_type == selected_type)
 
     sponsors = query.order_by(Sponsor.name.asc()).all()
-    sponsor_types = sorted({row.sponsor_type for row in Sponsor.query.filter(Sponsor.language == current_lang).all()})
-    return render_template("sponsors.html", sponsors=sponsors, sponsor_types=sponsor_types)
+    sponsor_types = sorted({row.sponsor_type for row in sponsors})
+    return render_template("sponsors.html", sponsors=sponsors, sponsor_types=sponsor_types, translation_fallback=translation_fallback)
 
 
 @app.route("/guides")
-def guides_page():
+@app.route("/<lang>/guides")
+def guides_page(lang: str | None = None):
     increment_analytics("guides", 0.5)
     selected_type = request.args.get("type", "")
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
 
-    query = LocalGuide.query.filter(LocalGuide.language == current_lang)
+    query, translation_fallback = apply_language_fallback(LocalGuide.query, LocalGuide, current_lang)
     if selected_type:
         query = query.filter(LocalGuide.guide_type == selected_type)
 
     guides = query.order_by(LocalGuide.created_at.desc()).all()
-    guide_types = sorted({row.guide_type for row in LocalGuide.query.filter(LocalGuide.language == current_lang).all()})
-    return render_template("guides.html", guides=guides, guide_types=guide_types)
+    guide_types = sorted({row.guide_type for row in guides})
+    return render_template("guides.html", guides=guides, guide_types=guide_types, translation_fallback=translation_fallback)
 
 
 @app.route("/faqs")
-def faqs_page():
+@app.route("/<lang>/faqs")
+def faqs_page(lang: str | None = None):
     increment_analytics("faqs", 0.5)
     keyword = request.args.get("q", "").strip().lower()
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
 
-    query = FAQ.query.filter(FAQ.language == current_lang)
+    query, translation_fallback = apply_language_fallback(FAQ.query, FAQ, current_lang)
     if keyword:
         query = query.filter(
             db.or_(
@@ -791,11 +849,12 @@ def faqs_page():
         )
 
     faqs = query.order_by(FAQ.created_at.desc()).all()
-    return render_template("faqs.html", faqs=faqs)
+    return render_template("faqs.html", faqs=faqs, translation_fallback=translation_fallback)
 
 
 @app.route("/about")
-def about_page():
+@app.route("/<lang>/about")
+def about_page(lang: str | None = None):
     increment_analytics("about", 0.4)
     highlighted_regions = [
         "Bujumbura waterfront venues",
@@ -806,7 +865,8 @@ def about_page():
 
 
 @app.route("/contact", methods=["GET", "POST"])
-def contact_page():
+@app.route("/<lang>/contact", methods=["GET", "POST"])
+def contact_page(lang: str | None = None):
     increment_analytics("contact", 0.6)
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -823,21 +883,22 @@ def contact_page():
 
         sent, feedback = send_contact_email(name, email, phone, message)
         flash(feedback, "success" if sent else "warning")
-        return redirect(url_for("contact_page"))
+        return redirect(url_for("contact_page", lang=get_lang_segment(get_public_lang(lang))))
 
     return render_template("contact.html")
 
 
 @app.route("/blog")
-def blog_home():
+@app.route("/<lang>/blog")
+def blog_home(lang: str | None = None):
     increment_analytics("blog", 0.9)
     keyword = request.args.get("keyword", "").strip().lower()
     category_id = request.args.get("category", type=int)
     page = request.args.get("page", 1, type=int)
     per_page = 6
-    current_lang = session.get("public_lang", "fr")
+    current_lang = get_public_lang(lang)
 
-    query = Post.query.filter(Post.language == current_lang)
+    query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
     if keyword:
         query = query.filter(Post.title.ilike(f"%{keyword}%"))
     if category_id:
@@ -845,7 +906,7 @@ def blog_home():
 
     posts = query.order_by(Post.published_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     post_cards = [build_post_card(post) for post in posts.items]
-    recent_posts = [build_post_card(post) for post in Post.query.filter(Post.language == current_lang).order_by(Post.published_at.desc()).limit(5).all()]
+    recent_posts = [build_post_card(post) for post in query.order_by(Post.published_at.desc()).limit(5).all()]
     post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
     return render_template(
         "blog.html",
@@ -853,11 +914,14 @@ def blog_home():
         pagination=posts,
         post_categories=post_categories,
         recent_posts=recent_posts,
+        translation_fallback=posts_fallback,
     )
 
 
 @app.route("/blog/<int:post_id>")
-def blog_post_detail(post_id: int):
+@app.route("/<lang>/blog/<int:post_id>")
+def blog_post_detail(post_id: int, lang: str | None = None):
+    current_lang = get_public_lang(lang)
     post = Post.query.get_or_404(post_id)
     log_tracking_event(
         content_type="post",
@@ -884,6 +948,7 @@ def blog_post_detail(post_id: int):
         related_posts=related_posts,
         recent_posts=recent_posts,
         post_categories=post_categories,
+        translation_fallback=(post.language != current_lang and post.language == PRIMARY_PUBLIC_LANG),
     )
 
 
@@ -907,7 +972,8 @@ def login():
 def logout():
     session.pop("admin_user", None)
     flash("You have been logged out.", "info")
-    return redirect(url_for("home"))
+    active_lang = get_public_lang()
+    return redirect(url_for("home", lang=get_lang_segment(active_lang)))
 
 
 @app.route("/admin/dashboard")

@@ -6,6 +6,7 @@ Flask web application with:
 
 ## Public site highlights
 - Mobile-first header with logo, navigation, language switcher (Kirundi/French), and hamburger menu
+- Language-aware URLs (`/kirundi/...` and `/fr/...`) with Kirundi-first fallback when translations are unavailable
 - Hero banner with featured event and CTA
 - Upcoming events card grid with hover effects
 - Real-time client-side search/filter/sort interactions
@@ -38,16 +39,16 @@ python app.py
 ```
 
 ## Routes
-- Public landing page: `http://localhost:5000/`
-- Public events home: `http://localhost:5000/home`
+- Public landing page: `http://localhost:5000/kirundi/` (or `http://localhost:5000/fr/`)
+- Public events home: `http://localhost:5000/kirundi/home` (or `http://localhost:5000/fr/home`)
 - Admin login: `http://localhost:5000/admin/login`
 
-- Public blog: `http://localhost:5000/blog`
-- About page: `http://localhost:5000/about`
-- Contact page: `http://localhost:5000/contact`
-- Media gallery: `http://localhost:5000/gallery`
-- Sponsors page: `http://localhost:5000/sponsors`
-- Local guides page: `http://localhost:5000/guides`
-- FAQs page: `http://localhost:5000/faqs`
-- Search page: `http://localhost:5000/search`
+- Public blog: `http://localhost:5000/kirundi/blog`
+- About page: `http://localhost:5000/kirundi/about`
+- Contact page: `http://localhost:5000/kirundi/contact`
+- Media gallery: `http://localhost:5000/kirundi/gallery`
+- Sponsors page: `http://localhost:5000/kirundi/sponsors`
+- Local guides page: `http://localhost:5000/kirundi/guides`
+- FAQs page: `http://localhost:5000/kirundi/faqs`
+- Search page: `http://localhost:5000/kirundi/search`
 - Analytics dashboard: `http://localhost:5000/admin/analytics`
