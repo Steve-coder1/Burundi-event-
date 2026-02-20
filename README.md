@@ -19,6 +19,7 @@ Flask web application with:
 - Public media gallery with image/video grid, filters, lightbox, and load-more interactions
 - Sponsors, Local Guides, and FAQs pages with filters and accordion interactions
 - Unified search and filter system across events, posts, and media with live API results
+- Advanced analytics tracking (views, unique visitors, content performance, referrals, CSV export)
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -48,3 +49,4 @@ python app.py
 - Local guides page: `http://localhost:5000/guides`
 - FAQs page: `http://localhost:5000/faqs`
 - Search page: `http://localhost:5000/search`
+- Analytics dashboard: `http://localhost:5000/admin/analytics`

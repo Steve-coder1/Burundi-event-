@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import os
+import csv
 import smtplib
+from io import StringIO
 from datetime import datetime
 from email.message import EmailMessage
 from functools import wraps
 from uuid import uuid4
+from urllib.parse import urlparse
 
 from flask import (
     Flask,
     flash,
     jsonify,
+    Response,
     redirect,
     render_template,
     request,
@@ -18,7 +22,7 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import func, text
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -147,6 +151,18 @@ class FAQ(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class TrackingEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    visitor_id = db.Column(db.String(64), nullable=False)
+    content_type = db.Column(db.String(20), nullable=False)  # page|event|post|media
+    content_id = db.Column(db.String(64), nullable=False)
+    content_title = db.Column(db.String(255), nullable=True)
+    category = db.Column(db.String(120), nullable=True)
+    interaction = db.Column(db.String(20), default="view")
+    referrer_domain = db.Column(db.String(120), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # Relation helpers
 Event.categories = db.relationship(
     "Category",
@@ -175,6 +191,37 @@ def login_required(view_func):
     return wrapper
 
 
+def get_referrer_domain() -> str:
+    referrer = request.referrer or ""
+    if not referrer:
+        return "direct"
+    try:
+        return urlparse(referrer).netloc or "direct"
+    except Exception:
+        return "direct"
+
+
+def log_tracking_event(
+    content_type: str,
+    content_id: str,
+    title: str = "",
+    category: str = "",
+    interaction: str = "view",
+) -> None:
+    visitor_id = session.get("visitor_id", "anonymous")
+    db.session.add(
+        TrackingEvent(
+            visitor_id=visitor_id,
+            content_type=content_type,
+            content_id=str(content_id),
+            content_title=title,
+            category=category,
+            interaction=interaction,
+            referrer_domain=get_referrer_domain(),
+        )
+    )
+
+
 def increment_analytics(page: str, score: float = 0.5) -> None:
     record = Analytics.query.filter_by(page=page).first()
     if not record:
@@ -182,6 +229,7 @@ def increment_analytics(page: str, score: float = 0.5) -> None:
         db.session.add(record)
     record.views += 1
     record.popularity_score += score
+    log_tracking_event(content_type="page", content_id=page, title=page)
     db.session.commit()
 
 
@@ -409,6 +457,8 @@ def inject_globals():
 
 @app.before_request
 def ensure_seed_data():
+    if not session.get("visitor_id"):
+        session["visitor_id"] = uuid4().hex
     db.create_all()
     with db.engine.connect() as conn:
         event_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(event)"))}
@@ -549,6 +599,12 @@ def public_events():
 @app.route("/events/<int:event_id>")
 def event_detail(event_id: int):
     event = Event.query.get_or_404(event_id)
+    log_tracking_event(
+        content_type="event",
+        content_id=str(event.id),
+        title=event.title,
+        category=event.categories[0].name if event.categories else "General",
+    )
     gallery = Media.query.filter_by(linked_type="event", linked_id=event.id).order_by(Media.uploaded_at.desc()).all()
 
     related_query = Event.query.filter(Event.id != event.id, Event.language == event.language)
@@ -622,9 +678,30 @@ def api_autocomplete():
     return jsonify({"suggestions": seen})
 
 
+@app.route("/api/track", methods=["POST"])
+def api_track():
+    payload = request.get_json(silent=True) or {}
+    content_type = payload.get("content_type", "page")
+    content_id = str(payload.get("content_id", "unknown"))
+    title = payload.get("title", "")
+    category = payload.get("category", "")
+    interaction = payload.get("interaction", "click")
+
+    log_tracking_event(
+        content_type=content_type,
+        content_id=content_id,
+        title=title,
+        category=category,
+        interaction=interaction,
+    )
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/gallery")
 def media_gallery():
     increment_analytics("media_gallery", 0.8)
+    log_tracking_event(content_type="media", content_id="gallery", title="Public Media Gallery")
     selected_type = request.args.get("type", "")
     selected_linked_type = request.args.get("linked_type", "")
     selected_category = request.args.get("category", "")
@@ -773,6 +850,12 @@ def blog_home():
 @app.route("/blog/<int:post_id>")
 def blog_post_detail(post_id: int):
     post = Post.query.get_or_404(post_id)
+    log_tracking_event(
+        content_type="post",
+        content_id=str(post.id),
+        title=post.title,
+        category=post.categories[0].name if post.categories else "General",
+    )
     media_items = Media.query.filter_by(linked_type="post", linked_id=post.id).order_by(Media.uploaded_at.desc()).all()
 
     related_query = Post.query.filter(Post.id != post.id, Post.language == post.language)
@@ -1120,16 +1203,126 @@ def delete_media(media_id: int):
 @app.route("/admin/analytics")
 @login_required
 def analytics():
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    content_type = request.args.get("content_type", "")
+    category = request.args.get("category", "")
+
+    query = TrackingEvent.query.filter_by(interaction="view")
+    if content_type in {"page", "event", "post", "media"}:
+        query = query.filter(TrackingEvent.content_type == content_type)
+    if category:
+        query = query.filter(TrackingEvent.category == category)
+    if date_from:
+        query = query.filter(func.date(TrackingEvent.created_at) >= date_from)
+    if date_to:
+        query = query.filter(func.date(TrackingEvent.created_at) <= date_to)
+
     rows = Analytics.query.order_by(Analytics.views.desc()).all()
     labels = [row.page for row in rows]
     view_values = [row.views for row in rows]
     popularity_values = [row.popularity_score for row in rows]
+
+    total_page_views = query.count()
+    unique_visitors = query.with_entities(TrackingEvent.visitor_id).distinct().count()
+
+    event_performance = (
+        query.filter(TrackingEvent.content_type == "event")
+        .with_entities(
+            TrackingEvent.content_id,
+            TrackingEvent.content_title,
+            TrackingEvent.category,
+            func.count(TrackingEvent.id).label("views"),
+        )
+        .group_by(TrackingEvent.content_id, TrackingEvent.content_title, TrackingEvent.category)
+        .order_by(func.count(TrackingEvent.id).desc())
+        .all()
+    )
+
+    post_performance = (
+        query.filter(TrackingEvent.content_type == "post")
+        .with_entities(
+            TrackingEvent.content_id,
+            TrackingEvent.content_title,
+            TrackingEvent.category,
+            func.count(TrackingEvent.id).label("views"),
+        )
+        .group_by(TrackingEvent.content_id, TrackingEvent.content_title, TrackingEvent.category)
+        .order_by(func.count(TrackingEvent.id).desc())
+        .all()
+    )
+
+    traffic_daily = (
+        query.with_entities(func.date(TrackingEvent.created_at).label("day"), func.count(TrackingEvent.id).label("count"))
+        .group_by(func.date(TrackingEvent.created_at))
+        .order_by(func.date(TrackingEvent.created_at).asc())
+        .all()
+    )
+    traffic_labels = [str(item.day) for item in traffic_daily]
+    traffic_values = [item.count for item in traffic_daily]
+
+    referrers = (
+        query.with_entities(TrackingEvent.referrer_domain, func.count(TrackingEvent.id).label("count"))
+        .group_by(TrackingEvent.referrer_domain)
+        .order_by(func.count(TrackingEvent.id).desc())
+        .limit(8)
+        .all()
+    )
+
+    categories = sorted(
+        {
+            category_name
+            for category_name, in db.session.query(TrackingEvent.category)
+            .filter(TrackingEvent.category.isnot(None), TrackingEvent.category != "")
+            .distinct()
+            .all()
+        }
+    )
+
     return render_template(
         "analytics.html",
         rows=rows,
         labels=labels,
         view_values=view_values,
         popularity_values=popularity_values,
+        total_page_views=total_page_views,
+        unique_visitors=unique_visitors,
+        top_events=event_performance[:5],
+        top_posts=post_performance[:5],
+        event_performance=event_performance,
+        post_performance=post_performance,
+        traffic_labels=traffic_labels,
+        traffic_values=traffic_values,
+        referrers=referrers,
+        categories=categories,
+    )
+
+
+@app.route("/admin/analytics/export")
+@login_required
+def analytics_export():
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["content_type", "content_id", "title", "category", "interaction", "referrer", "created_at"])
+
+    events = TrackingEvent.query.order_by(TrackingEvent.created_at.desc()).all()
+    for item in events:
+        writer.writerow(
+            [
+                item.content_type,
+                item.content_id,
+                item.content_title or "",
+                item.category or "",
+                item.interaction,
+                item.referrer_domain or "",
+                item.created_at.isoformat(),
+            ]
+        )
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=analytics_report.csv"},
     )
 
 

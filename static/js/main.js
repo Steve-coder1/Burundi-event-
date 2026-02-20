@@ -86,6 +86,22 @@ if (lightbox && lightboxContent) {
       } else {
         lightboxContent.innerHTML = `<img src="${src}" alt="Gallery item">`;
       }
+      const trackType = thumb.dataset.trackContentType;
+      const trackId = thumb.dataset.trackContentId;
+      if (trackType && trackId) {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content_type: trackType,
+            content_id: trackId,
+            title: thumb.dataset.trackTitle || '',
+            category: thumb.dataset.trackCategory || '',
+            interaction: 'open',
+          }),
+          keepalive: true,
+        });
+      }
       lightbox.classList.remove('hidden');
     });
   });
@@ -322,8 +338,26 @@ async function renderSearchResults(reset = true) {
       const card = document.createElement('a');
       card.className = 'event-card search-result-card';
       card.href = row.url;
+      card.dataset.trackContentType = row.content_type;
+      card.dataset.trackContentId = String(row.id);
+      card.dataset.trackTitle = row.title;
+      card.dataset.trackCategory = row.category || '';
       const thumb = row.thumbnail ? `<img src="${row.thumbnail}" alt="${row.title}">` : '<div class="image-placeholder">No image</div>';
       card.innerHTML = `${thumb}<div class="event-card-body"><span class="badge">${row.content_type} · ${row.category}</span><h3>${highlightKeyword(row.title, keyword)}</h3><p>${row.date}</p><p>${highlightKeyword(row.description, keyword)}</p></div>`;
+      card.addEventListener('click', () => {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content_type: card.dataset.trackContentType,
+            content_id: card.dataset.trackContentId,
+            title: card.dataset.trackTitle,
+            category: card.dataset.trackCategory,
+            interaction: 'click',
+          }),
+          keepalive: true,
+        });
+      });
       resultsGrid.appendChild(card);
     });
   }

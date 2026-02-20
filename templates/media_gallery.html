@@ -50,6 +50,10 @@
     data-linked-type="{{ card.linked_type }}"
     data-category="{{ card.linked_category }}"
     data-event-id="{{ card.linked_id if card.linked_type == 'event' else '' }}"
+    data-track-content-type="media"
+    data-track-content-id="{{ card.id }}"
+    data-track-title="{{ card.linked_title }}"
+    data-track-category="{{ card.linked_category }}"
   >
     {% if card.media_type == 'image' %}
       <img src="{{ url_for('static', filename='uploads/' + card.filename) }}" alt="{{ card.linked_title }}">
