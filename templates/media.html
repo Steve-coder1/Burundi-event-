@@ -1,0 +1,48 @@
+{% extends 'base_admin.html' %}
+{% block content %}
+<h1>Media Library</h1>
+<form method="post" enctype="multipart/form-data" class="card form-grid" id="upload-form">
+  <label>Drag and drop or select media files
+    <input type="file" name="media_files" multiple required>
+  </label>
+  <label>Linked Content Type
+    <select name="linked_type">
+      <option value="">None</option>
+      <option value="event">Event</option>
+      <option value="post">Post</option>
+    </select>
+  </label>
+  <label>Linked Content ID (optional)
+    <input type="number" name="linked_id" min="1">
+  </label>
+  <button class="btn" type="submit">Upload</button>
+</form>
+
+<form method="get" class="filters">
+  <select name="type">
+    <option value="">All media</option>
+    <option value="image" {% if request.args.get('type') == 'image' %}selected{% endif %}>Images</option>
+    <option value="video" {% if request.args.get('type') == 'video' %}selected{% endif %}>Videos</option>
+  </select>
+  <button class="btn" type="submit">Apply</button>
+</form>
+
+<div class="media-grid">
+{% for item in media_items %}
+  <article class="card media-item">
+    {% if item.media_type == 'image' %}
+      <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ item.filename }}">
+    {% else %}
+      <video controls>
+        <source src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+      </video>
+    {% endif %}
+    <p>{{ item.filename }}</p>
+    <small>{{ item.media_type }}{% if item.linked_type %} · {{ item.linked_type }} #{{ item.linked_id }}{% endif %}</small>
+    <form method="post" action="{{ url_for('delete_media', media_id=item.id) }}" class="inline" onsubmit="return confirm('Delete media?');">
+      <button class="text-btn" type="submit">Delete</button>
+    </form>
+  </article>
+{% endfor %}
+</div>
+{% endblock %}
