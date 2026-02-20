@@ -137,6 +137,114 @@ def login_required(view_func):
     return wrapper
 
 
+
+
+def slugify_text(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    return cleaned or "item"
+
+
+def event_slug(event: Event) -> str:
+    return slugify_text(event.title)
+
+
+def post_slug(post: Post) -> str:
+    return slugify_text(post.title)
+
+
+def event_public_url(event: Event, lang: str | None = None, external: bool = False) -> str:
+    chosen = normalize_public_lang(lang or event.language or PRIMARY_PUBLIC_LANG)
+    return url_for("event_detail", lang=get_lang_segment(chosen), slug=event_slug(event), event_id=event.id, _external=external)
+
+
+def post_public_url(post: Post, lang: str | None = None, external: bool = False) -> str:
+    chosen = normalize_public_lang(lang or post.language or PRIMARY_PUBLIC_LANG)
+    return url_for("blog_post_detail", lang=get_lang_segment(chosen), slug=post_slug(post), post_id=post.id, _external=external)
+
+
+def build_seo_meta(title: str, description: str, language: str, keywords: str = "", image_url: str = "", url: str = "", content_type: str = "website") -> dict:
+    return {
+        "title": title,
+        "description": description[:160],
+        "keywords": keywords,
+        "lang": language,
+        "url": url or request.url,
+        "image": image_url,
+        "type": content_type,
+    }
+
+
+
+def build_breadcrumbs() -> list[dict[str, str]]:
+    endpoint = request.endpoint or ""
+    if endpoint.startswith("admin") or endpoint in {"login", "logout", "api_search", "api_autocomplete", "api_track", "sitemap_xml", "robots_txt", "static"}:
+        return []
+
+    current_lang = get_public_lang()
+    segment = get_lang_segment(current_lang)
+    crumbs = [{"label": "Home", "url": url_for("index", lang=segment)}]
+
+    if endpoint in {"home", "public_events", "event_detail"}:
+        crumbs.append({"label": "Events", "url": url_for("home", lang=segment)})
+    if endpoint in {"blog_home", "blog_post_detail"}:
+        crumbs.append({"label": "Blog", "url": url_for("blog_home", lang=segment)})
+    if endpoint == "media_gallery":
+        crumbs.append({"label": "Media", "url": url_for("media_gallery", lang=segment)})
+    if endpoint == "sponsors_page":
+        crumbs.append({"label": "Sponsors", "url": url_for("sponsors_page", lang=segment)})
+    if endpoint == "guides_page":
+        crumbs.append({"label": "Guides", "url": url_for("guides_page", lang=segment)})
+    if endpoint == "faqs_page":
+        crumbs.append({"label": "FAQs", "url": url_for("faqs_page", lang=segment)})
+    if endpoint == "about_page":
+        crumbs.append({"label": "About", "url": url_for("about_page", lang=segment)})
+    if endpoint == "contact_page":
+        crumbs.append({"label": "Contact", "url": url_for("contact_page", lang=segment)})
+    if endpoint == "search_page":
+        crumbs.append({"label": "Search", "url": url_for("search_page", lang=segment)})
+
+    if endpoint == "event_detail":
+        event = Event.query.get(request.view_args.get("event_id")) if request.view_args else None
+        if event:
+            crumbs.append({"label": event.title, "url": event_public_url(event, current_lang)})
+    if endpoint == "blog_post_detail":
+        post = Post.query.get(request.view_args.get("post_id")) if request.view_args else None
+        if post:
+            crumbs.append({"label": post.title, "url": post_public_url(post, current_lang)})
+
+    return crumbs
+
+def get_referrer_domain() -> str:
+    referrer = request.referrer or ""
+    if not referrer:
+        return "direct"
+    try:
+        return urlparse(referrer).netloc or "direct"
+    except Exception:
+        return "direct"
+
+
+def log_tracking_event(
+    content_type: str,
+    content_id: str,
+    title: str = "",
+    category: str = "",
+    interaction: str = "view",
+) -> None:
+    visitor_id = session.get("visitor_id", "anonymous")
+    db.session.add(
+        TrackingEvent(
+            visitor_id=visitor_id,
+            content_type=content_type,
+            content_id=str(content_id),
+            content_title=title,
+            category=category,
+            interaction=interaction,
+            referrer_domain=get_referrer_domain(),
+        )
+    )
+
+
 def increment_analytics(page: str, score: float = 0.5) -> None:
     record = Analytics.query.filter_by(page=page).first()
     if not record:
@@ -181,7 +289,7 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/logout")
+@app.route("/admin/logout")
 @login_required
 def logout():
     session.pop("admin_user", None)
