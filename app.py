@@ -554,7 +554,16 @@ def ensure_seed_data():
 
 @app.route("/")
 def index():
-    return redirect(url_for("home"))
+    current_lang = session.get("public_lang", "fr")
+    upcoming_events = (
+        Event.query.filter(Event.language == current_lang)
+        .order_by(Event.event_date.asc())
+        .limit(6)
+        .all()
+    )
+    featured_cards = [build_event_card(event) for event in upcoming_events]
+    recent_posts = [build_post_card(post) for post in Post.query.order_by(Post.published_at.desc()).limit(3).all()]
+    return render_template("landing.html", featured_events=featured_cards, recent_posts=recent_posts)
 
 
 @app.route("/home")

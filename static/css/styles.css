@@ -134,3 +134,9 @@ th, td { border-bottom: 1px solid #e5e7eb; padding: .75rem; text-align: left; }
   .search-topbar { position: static; }
   .suggestions { position: static; margin-top: .35rem; }
 }
+
+.btn-secondary { background: #0f172a; }
+.landing-hero { background: linear-gradient(120deg, #0f172a, #1d4ed8); color: #fff; border-radius: 12px; padding: 2rem; margin-bottom: 1.2rem; }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; color: #bfdbfe; font-weight: 700; font-size: .75rem; }
+.landing-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .85rem; }
+.landing-section { margin-bottom: 1.25rem; }

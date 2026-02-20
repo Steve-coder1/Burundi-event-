@@ -1,7 +1,7 @@
 # Burundi Event Platform (Public + Admin)
 
 Flask web application with:
-- a public home page featuring upcoming events in an Instagram-style layout
+- a public landing page and home experience featuring upcoming events in an Instagram-style layout
 - an admin dashboard for events, blog posts, categories, media, and analytics
 
 ## Public site highlights
@@ -38,7 +38,8 @@ python app.py
 ```
 
 ## Routes
-- Public home: `http://localhost:5000/home`
+- Public landing page: `http://localhost:5000/`
+- Public events home: `http://localhost:5000/home`
 - Admin login: `http://localhost:5000/admin/login`
 
 - Public blog: `http://localhost:5000/blog`

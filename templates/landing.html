@@ -1,0 +1,51 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="landing-hero">
+  <div>
+    <p class="eyebrow">Burundi Events Platform</p>
+    <h1>Find local events, stories, and community highlights in one place.</h1>
+    <p>Start from this landing page, then explore upcoming events, local guides, blog stories, and media highlights.</p>
+    <div class="landing-actions">
+      <a class="btn" href="{{ url_for('home') }}">Explore Events</a>
+      <a class="btn btn-secondary" href="{{ url_for('blog_home') }}">Read Blog</a>
+    </div>
+  </div>
+</section>
+
+<section class="landing-section">
+  <h2>Upcoming Picks</h2>
+  <div class="event-grid">
+    {% for card in featured_events %}
+    <a href="{{ url_for('event_detail', event_id=card.id) }}" class="event-card">
+      {% if card.image %}
+      <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
+      {% else %}
+      <div class="image-placeholder">No image</div>
+      {% endif %}
+      <div class="event-card-body">
+        <span class="badge">{{ card.category }}</span>
+        <h3>{{ card.title }}</h3>
+        <p>{{ card.date }} · {{ card.time }}<br>{{ card.location }}</p>
+      </div>
+    </a>
+    {% else %}
+    <p>No events yet. Visit the admin dashboard to add your first event.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="landing-section">
+  <h2>Latest Stories</h2>
+  <div class="blog-grid">
+    {% for post in recent_posts %}
+    <article class="card">
+      <h3>{{ post.title }}</h3>
+      <p>{{ post.published }}</p>
+      <p>{{ post.excerpt }}</p>
+    </article>
+    {% else %}
+    <p>No posts yet.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
