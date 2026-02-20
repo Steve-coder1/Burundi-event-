@@ -311,6 +311,7 @@ def dashboard():
     return render_template("dashboard.html", stats=stats, top_pages=top_pages)
 
 
+@app.route("/admin/events")
 @app.route("/events")
 @login_required
 def events_list():
