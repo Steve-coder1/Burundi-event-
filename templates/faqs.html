@@ -1,0 +1,27 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero faqs-hero">
+  <div class="hero-overlay">
+    <h1>Frequently Asked Questions</h1>
+    <p>Quick answers to common questions from visitors and organizers.</p>
+  </div>
+</section>
+
+<section class="card">
+  <form method="get" class="filters">
+    <input type="text" name="q" id="faq-search" placeholder="Search FAQs" value="{{ request.args.get('q', '') }}">
+    <button class="btn" type="submit">Search</button>
+  </form>
+</section>
+
+<section class="faq-list" id="faq-list">
+  {% for faq in faqs %}
+  <article class="card faq-item" data-faq-text="{{ (faq.question ~ ' ' ~ faq.answer)|lower }}">
+    <button type="button" class="faq-question">{{ faq.question }}</button>
+    <div class="faq-answer hidden">{{ faq.answer }}</div>
+  </article>
+  {% else %}
+  <p>No FAQs found.</p>
+  {% endfor %}
+</section>
+{% endblock %}

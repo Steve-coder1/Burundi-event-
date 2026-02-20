@@ -1,0 +1,44 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero contact-hero">
+  <div class="hero-overlay">
+    <h1>Contact Us</h1>
+    <p>Share feedback, suggest an event, or reach our local team.</p>
+  </div>
+</section>
+
+<div class="grid blog-layout">
+  <section class="card">
+    <h2>Send a Message</h2>
+    <form method="post" id="contact-form" class="form-grid" novalidate>
+      <label>Name
+        <input type="text" name="name" id="contact-name" required>
+      </label>
+      <label>Email
+        <input type="email" name="email" id="contact-email" required>
+      </label>
+      <label>Phone (optional)
+        <input type="text" name="phone" id="contact-phone">
+      </label>
+      <label>Message
+        <textarea name="message" id="contact-message" rows="6" required></textarea>
+      </label>
+      <p id="contact-error" class="form-error"></p>
+      <button class="btn" type="submit">Send Message</button>
+    </form>
+  </section>
+
+  <aside class="card sidebar-widget">
+    <h3>Social Profiles</h3>
+    <ul>
+      <li><a href="#">Instagram</a></li>
+      <li><a href="#">Facebook</a></li>
+      <li><a href="#">X / Twitter</a></li>
+    </ul>
+
+    <h3>Local Office</h3>
+    <p>Rohero, Bujumbura, Burundi</p>
+    <div class="map-image">Bujumbura, Burundi (static map placeholder)</div>
+  </aside>
+</div>
+{% endblock %}

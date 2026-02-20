@@ -1,0 +1,17 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<div class="card auth-card">
+  <h1>Admin Login</h1>
+  <p>Use your administrator credentials to manage site content.</p>
+  <form method="post" class="form-grid">
+    <label>Username
+      <input type="text" name="username" required>
+    </label>
+    <label>Password
+      <input type="password" name="password" required>
+    </label>
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+  <small>Default credentials: admin / admin123</small>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'base_admin.html' %}
+{% block content %}
+<h1>{{ 'Edit Event' if event else 'Add Event' }}</h1>
+<div class="grid two-col">
+  <form method="post" class="card form-grid">
+    <label>Title
+      <input name="title" required value="{{ event.title if event else '' }}">
+    </label>
+    <label>Date
+      <input type="datetime-local" name="event_date" required value="{{ event.event_date.strftime('%Y-%m-%dT%H:%M') if event else '' }}">
+    </label>
+    <label>Language
+      <select name="language">
+        <option value="en" {% if event and event.language == 'en' %}selected{% endif %}>English</option>
+        <option value="fr" {% if event and event.language == 'fr' %}selected{% endif %}>French</option>
+        <option value="rn" {% if event and event.language == 'rn' %}selected{% endif %}>Kirundi</option>
+      </select>
+    </label>
+    <label>Location
+      <input name="location" value="{{ event.location if event else '' }}" placeholder="Bujumbura Downtown, Avenue ...">
+    </label>
+    <label>Tags (comma separated)
+      <input name="tags" value="{{ event.tags if event else '' }}" placeholder="music, youth, culture">
+    </label>
+    <label>SEO Title
+      <input name="seo_title" value="{{ event.seo_title if event else '' }}" placeholder="Custom title for search engines">
+    </label>
+    <label>SEO Description
+      <input name="seo_description" value="{{ event.seo_description if event else '' }}" placeholder="Short description for search results">
+    </label>
+    <label>SEO Keywords
+      <input name="seo_keywords" value="{{ event.seo_keywords if event else '' }}" placeholder="events, burundi, culture">
+    </label>
+    <label>Categories
+      <select name="categories" multiple size="5">
+        {% for category in categories %}
+          <option value="{{ category.id }}" {% if event and category in event.categories %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Description
+      <textarea name="description" rows="8" required data-preview-target="#preview-event">{{ event.description if event else '' }}</textarea>
+    </label>
+    <button class="btn" type="submit">{{ 'Save Changes' if event else 'Create Event' }}</button>
+  </form>
+  <aside class="card">
+    <h3>Live Preview</h3>
+    <div id="preview-event" class="preview"></div>
+  </aside>
+</div>
+{% endblock %}
