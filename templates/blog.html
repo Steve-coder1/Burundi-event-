@@ -19,7 +19,7 @@
 
     <div class="blog-grid" id="blog-grid">
       {% for post in posts %}
-      <a href="{{ url_for('blog_post_detail', post_id=post.id, lang=current_public_lang_segment) }}" class="event-card blog-card" data-title="{{ post.title|lower }}" data-category="{{ post.category_id }}">
+      <a href="{{ url_for('blog_post_detail', post_id=post.id, slug=post.slug, lang=current_public_lang_segment) }}" class="event-card blog-card" data-title="{{ post.title|lower }}" data-category="{{ post.category_id }}">
         {% if post.image %}
           <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}">
         {% else %}
@@ -54,7 +54,7 @@
     <h3>Recent Posts</h3>
     <ul>
       {% for item in recent_posts %}
-      <li><a href="{{ url_for('blog_post_detail', post_id=item.id, lang=current_public_lang_segment) }}">{{ item.title }}</a></li>
+      <li><a href="{{ url_for('blog_post_detail', post_id=item.id, slug=item.slug, lang=current_public_lang_segment) }}">{{ item.title }}</a></li>
       {% endfor %}
     </ul>
 

@@ -22,6 +22,15 @@
     <label>Tags (comma separated)
       <input name="tags" value="{{ event.tags if event else '' }}" placeholder="music, youth, culture">
     </label>
+    <label>SEO Title
+      <input name="seo_title" value="{{ event.seo_title if event else '' }}" placeholder="Custom title for search engines">
+    </label>
+    <label>SEO Description
+      <input name="seo_description" value="{{ event.seo_description if event else '' }}" placeholder="Short description for search results">
+    </label>
+    <label>SEO Keywords
+      <input name="seo_keywords" value="{{ event.seo_keywords if event else '' }}" placeholder="events, burundi, culture">
+    </label>
     <label>Categories
       <select name="categories" multiple size="5">
         {% for category in categories %}

@@ -19,6 +19,15 @@
     <label>Tags (comma separated)
       <input name="tags" value="{{ post.tags if post else '' }}" placeholder="announcement, community">
     </label>
+    <label>SEO Title
+      <input name="seo_title" value="{{ post.seo_title if post else '' }}" placeholder="Custom title for search engines">
+    </label>
+    <label>SEO Description
+      <input name="seo_description" value="{{ post.seo_description if post else '' }}" placeholder="Short description for search results">
+    </label>
+    <label>SEO Keywords
+      <input name="seo_keywords" value="{{ post.seo_keywords if post else '' }}" placeholder="blog, news, burundi">
+    </label>
     <label>Categories
       <select name="categories" multiple size="5">
         {% for category in categories %}

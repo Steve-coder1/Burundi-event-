@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import csv
+import re
 import smtplib
 from io import StringIO
 from datetime import datetime
@@ -103,6 +104,9 @@ class Event(db.Model):
     location = db.Column(db.String(200), default="TBD")
     tags = db.Column(db.String(255), default="")
     language = db.Column(db.String(10), default="en")
+    seo_title = db.Column(db.String(255), default="")
+    seo_description = db.Column(db.String(255), default="")
+    seo_keywords = db.Column(db.String(255), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -112,6 +116,9 @@ class Post(db.Model):
     body = db.Column(db.Text, nullable=False)
     language = db.Column(db.String(10), default="fr")
     tags = db.Column(db.String(255), default="")
+    seo_title = db.Column(db.String(255), default="")
+    seo_description = db.Column(db.String(255), default="")
+    seo_keywords = db.Column(db.String(255), default="")
     published_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -223,6 +230,42 @@ def login_required(view_func):
     return wrapper
 
 
+
+
+def slugify_text(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    return cleaned or "item"
+
+
+def event_slug(event: Event) -> str:
+    return slugify_text(event.title)
+
+
+def post_slug(post: Post) -> str:
+    return slugify_text(post.title)
+
+
+def event_public_url(event: Event, lang: str | None = None, external: bool = False) -> str:
+    chosen = normalize_public_lang(lang or event.language or PRIMARY_PUBLIC_LANG)
+    return url_for("event_detail", lang=get_lang_segment(chosen), slug=event_slug(event), event_id=event.id, _external=external)
+
+
+def post_public_url(post: Post, lang: str | None = None, external: bool = False) -> str:
+    chosen = normalize_public_lang(lang or post.language or PRIMARY_PUBLIC_LANG)
+    return url_for("blog_post_detail", lang=get_lang_segment(chosen), slug=post_slug(post), post_id=post.id, _external=external)
+
+
+def build_seo_meta(title: str, description: str, language: str, keywords: str = "", image_url: str = "", url: str = "", content_type: str = "website") -> dict:
+    return {
+        "title": title,
+        "description": description[:160],
+        "keywords": keywords,
+        "lang": language,
+        "url": url or request.url,
+        "image": image_url,
+        "type": content_type,
+    }
+
 def get_referrer_domain() -> str:
     referrer = request.referrer or ""
     if not referrer:
@@ -286,6 +329,7 @@ def build_event_card(event: Event) -> dict:
         "description": event.description,
         "location": event.location or "TBD",
         "tags": [tag.strip() for tag in (event.tags or "").split(",") if tag.strip()],
+        "slug": event_slug(event),
     }
 
 
@@ -308,6 +352,7 @@ def build_post_card(post: Post) -> dict:
         "category_id": post.categories[0].id if post.categories else 0,
         "image": get_post_image(post.id),
         "tags": [tag.strip() for tag in (post.tags or "").split(",") if tag.strip()],
+        "slug": post_slug(post),
     }
 
 
@@ -362,7 +407,7 @@ def serialize_search_results(language: str) -> list[dict]:
                 "category": card["category"],
                 "tags": card["tags"],
                 "media_type": "",
-                "url": url_for("event_detail", event_id=event.id),
+                "url": event_public_url(event, language),
                 "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
             }
         )
@@ -380,7 +425,7 @@ def serialize_search_results(language: str) -> list[dict]:
                 "category": card["category"],
                 "tags": card["tags"],
                 "media_type": "",
-                "url": url_for("blog_post_detail", post_id=post.id),
+                "url": post_public_url(post, language),
                 "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
             }
         )
@@ -483,10 +528,18 @@ def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple
 @app.context_processor
 def inject_globals():
     active_lang = get_public_lang()
+    default_seo = build_seo_meta(
+        title="Burundi Events",
+        description="Discover local events, stories, and community highlights across Burundi.",
+        language=active_lang,
+        keywords="Burundi events, local events, Bujumbura, community",
+    )
     return {
         "current_public_lang": active_lang,
         "current_public_lang_segment": get_lang_segment(active_lang),
         "is_primary_lang": active_lang == PRIMARY_PUBLIC_LANG,
+        "seo": default_seo,
+        "structured_data": None,
     }
 
 
@@ -501,12 +554,24 @@ def ensure_seed_data():
             conn.execute(text("ALTER TABLE event ADD COLUMN location VARCHAR(200) DEFAULT 'TBD'"))
         if "tags" not in event_columns:
             conn.execute(text("ALTER TABLE event ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
+        if "seo_title" not in event_columns:
+            conn.execute(text("ALTER TABLE event ADD COLUMN seo_title VARCHAR(255) DEFAULT ''"))
+        if "seo_description" not in event_columns:
+            conn.execute(text("ALTER TABLE event ADD COLUMN seo_description VARCHAR(255) DEFAULT ''"))
+        if "seo_keywords" not in event_columns:
+            conn.execute(text("ALTER TABLE event ADD COLUMN seo_keywords VARCHAR(255) DEFAULT ''"))
 
         post_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(post)"))}
         if "language" not in post_columns:
             conn.execute(text("ALTER TABLE post ADD COLUMN language VARCHAR(10) DEFAULT 'fr'"))
         if "tags" not in post_columns:
             conn.execute(text("ALTER TABLE post ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
+        if "seo_title" not in post_columns:
+            conn.execute(text("ALTER TABLE post ADD COLUMN seo_title VARCHAR(255) DEFAULT ''"))
+        if "seo_description" not in post_columns:
+            conn.execute(text("ALTER TABLE post ADD COLUMN seo_description VARCHAR(255) DEFAULT ''"))
+        if "seo_keywords" not in post_columns:
+            conn.execute(text("ALTER TABLE post ADD COLUMN seo_keywords VARCHAR(255) DEFAULT ''"))
         conn.commit()
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -563,6 +628,16 @@ def ensure_seed_data():
             ]
         )
 
+    for event in Event.query.filter((Event.seo_title == "") | (Event.seo_title.is_(None))).all():
+        event.seo_title = event.title
+        event.seo_description = (event.description or "")[:160]
+        event.seo_keywords = event.tags or "burundi,event"
+
+    for post in Post.query.filter((Post.seo_title == "") | (Post.seo_title.is_(None))).all():
+        post.seo_title = post.title
+        post.seo_description = (post.body or "")[:160]
+        post.seo_keywords = post.tags or "burundi,blog,news"
+
     if FAQ.query.count() == 0:
         db.session.add_all(
             [
@@ -601,6 +676,12 @@ def index(lang: str | None = None):
         featured_events=featured_cards,
         recent_posts=recent_posts,
         translation_fallback=event_fallback or post_fallback,
+        seo=build_seo_meta(
+            title="Burundi Events | Home",
+            description="Discover upcoming local events and stories in Burundi.",
+            language=current_lang,
+            keywords="Burundi events, local events, culture, community",
+        ),
     )
 
 
@@ -638,6 +719,12 @@ def home(lang: str | None = None):
         categories=event_categories,
         blog_highlights=blog_highlights,
         translation_fallback=events_fallback or posts_fallback,
+        seo=build_seo_meta(
+            title="Upcoming Events in Burundi",
+            description="Browse upcoming events in Burundi with filters and categories.",
+            language=current_lang,
+            keywords="events Burundi, concerts Burundi, community events",
+        ),
     )
 
 
@@ -650,9 +737,14 @@ def public_events(lang: str | None = None):
 
 @app.route("/events/<int:event_id>")
 @app.route("/<lang>/events/<int:event_id>")
-def event_detail(event_id: int, lang: str | None = None):
+@app.route("/events/<slug>-<int:event_id>")
+@app.route("/<lang>/events/<slug>-<int:event_id>")
+def event_detail(event_id: int, lang: str | None = None, slug: str | None = None):
     current_lang = get_public_lang(lang)
     event = Event.query.get_or_404(event_id)
+    canonical_slug = event_slug(event)
+    if slug != canonical_slug:
+        return redirect(event_public_url(event, current_lang), code=301)
     log_tracking_event(
         content_type="event",
         content_id=str(event.id),
@@ -670,7 +762,37 @@ def event_detail(event_id: int, lang: str | None = None):
     related_events = related_query.order_by(Event.event_date.asc()).limit(6).all()
     related_cards = [build_event_card(item) for item in related_events]
 
-    return render_template("event_detail.html", event=event, gallery=gallery, related_events=related_cards, translation_fallback=(event.language != current_lang and event.language == PRIMARY_PUBLIC_LANG))
+    event_image = get_event_image(event.id)
+    image_url = url_for("static", filename=f"uploads/{event_image}", _external=True) if event_image else ""
+    event_url = event_public_url(event, current_lang, external=True)
+    structured_data = {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "name": event.title,
+        "startDate": event.event_date.isoformat(),
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "location": {"@type": "Place", "name": event.location or "Burundi"},
+        "description": event.description,
+        "url": event_url,
+    }
+    return render_template(
+        "event_detail.html",
+        event=event,
+        gallery=gallery,
+        related_events=related_cards,
+        translation_fallback=(event.language != current_lang and event.language == PRIMARY_PUBLIC_LANG),
+        seo=build_seo_meta(
+            title=event.seo_title or event.title,
+            description=event.seo_description or event.description,
+            language=event.language,
+            keywords=event.seo_keywords or event.tags,
+            image_url=image_url,
+            url=event_url,
+            content_type="event",
+        ),
+        structured_data=structured_data,
+    )
 
 
 @app.route("/set-language/<lang>")
@@ -694,8 +816,49 @@ def search_page(lang: str | None = None):
         post_categories=post_categories,
         post_tags=post_tags,
         translation_fallback=posts_fallback,
+        seo=build_seo_meta(
+            title="Search Burundi Events, Posts and Media",
+            description="Find events, news posts, and media highlights across Burundi.",
+            language=current_lang,
+            keywords="search events Burundi, blog Burundi, media gallery",
+        ),
     )
 
+
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    pages = []
+    now = datetime.utcnow().date().isoformat()
+    for language in ("rn", "fr"):
+        segment = get_lang_segment(language)
+        pages.extend(
+            [
+                url_for("index", lang=segment, _external=True),
+                url_for("home", lang=segment, _external=True),
+                url_for("blog_home", lang=segment, _external=True),
+                url_for("media_gallery", lang=segment, _external=True),
+                url_for("search_page", lang=segment, _external=True),
+                url_for("about_page", lang=segment, _external=True),
+                url_for("contact_page", lang=segment, _external=True),
+            ]
+        )
+        pages.extend(event_public_url(event, language, external=True) for event in Event.query.filter_by(language=language).all())
+        pages.extend(post_public_url(post, language, external=True) for post in Post.query.filter_by(language=language).all())
+
+    unique_pages = sorted(set(pages))
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for page in unique_pages:
+        xml.append(f"<url><loc>{page}</loc><lastmod>{now}</lastmod></url>")
+    xml.append("</urlset>")
+    return Response("".join(xml), mimetype="application/xml")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    body = "User-agent: *\nAllow: /\nSitemap: " + url_for("sitemap_xml", _external=True)
+    return Response(body, mimetype="text/plain")
 
 @app.route("/api/search")
 def api_search():
@@ -915,14 +1078,25 @@ def blog_home(lang: str | None = None):
         post_categories=post_categories,
         recent_posts=recent_posts,
         translation_fallback=posts_fallback,
+        seo=build_seo_meta(
+            title="Burundi Blog & News",
+            description="Read latest Burundi event updates, announcements, and community stories.",
+            language=current_lang,
+            keywords="Burundi blog, Burundi news, event announcements",
+        ),
     )
 
 
 @app.route("/blog/<int:post_id>")
 @app.route("/<lang>/blog/<int:post_id>")
-def blog_post_detail(post_id: int, lang: str | None = None):
+@app.route("/blog/<slug>-<int:post_id>")
+@app.route("/<lang>/blog/<slug>-<int:post_id>")
+def blog_post_detail(post_id: int, lang: str | None = None, slug: str | None = None):
     current_lang = get_public_lang(lang)
     post = Post.query.get_or_404(post_id)
+    canonical_slug = post_slug(post)
+    if slug != canonical_slug:
+        return redirect(post_public_url(post, current_lang), code=301)
     log_tracking_event(
         content_type="post",
         content_id=str(post.id),
@@ -941,6 +1115,18 @@ def blog_post_detail(post_id: int, lang: str | None = None):
     related_posts = [build_post_card(item) for item in related_query.order_by(Post.published_at.desc()).limit(4).all()]
     recent_posts = [build_post_card(item) for item in Post.query.filter(Post.language == post.language).order_by(Post.published_at.desc()).limit(5).all()]
     post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
+    post_image = get_post_image(post.id)
+    image_url = url_for("static", filename=f"uploads/{post_image}", _external=True) if post_image else ""
+    post_url = post_public_url(post, current_lang, external=True)
+    structured_data = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post.title,
+        "datePublished": post.published_at.isoformat(),
+        "dateModified": post.published_at.isoformat(),
+        "description": (post.seo_description or post.body)[:160],
+        "url": post_url,
+    }
     return render_template(
         "blog_detail.html",
         post=post,
@@ -949,6 +1135,16 @@ def blog_post_detail(post_id: int, lang: str | None = None):
         recent_posts=recent_posts,
         post_categories=post_categories,
         translation_fallback=(post.language != current_lang and post.language == PRIMARY_PUBLIC_LANG),
+        seo=build_seo_meta(
+            title=post.seo_title or post.title,
+            description=post.seo_description or post.body,
+            language=post.language,
+            keywords=post.seo_keywords or post.tags,
+            image_url=image_url,
+            url=post_url,
+            content_type="article",
+        ),
+        structured_data=structured_data,
     )
 
 
@@ -1027,6 +1223,9 @@ def add_event():
         language = request.form.get("language", "en")
         location = request.form.get("location", "").strip() or "TBD"
         tags = request.form.get("tags", "").strip()
+        seo_title = request.form.get("seo_title", "").strip()
+        seo_description = request.form.get("seo_description", "").strip()
+        seo_keywords = request.form.get("seo_keywords", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not description or not date_str:
@@ -1040,6 +1239,9 @@ def add_event():
             language=language,
             location=location,
             tags=tags,
+            seo_title=seo_title or title,
+            seo_description=seo_description or description[:160],
+            seo_keywords=seo_keywords or tags,
         )
 
         for cid in selected_ids:
@@ -1066,6 +1268,9 @@ def edit_event(event_id: int):
         event.language = request.form.get("language", event.language)
         event.location = request.form.get("location", event.location)
         event.tags = request.form.get("tags", event.tags)
+        event.seo_title = request.form.get("seo_title", event.seo_title) or event.title
+        event.seo_description = request.form.get("seo_description", event.seo_description) or (event.description or "")[:160]
+        event.seo_keywords = request.form.get("seo_keywords", event.seo_keywords) or event.tags
         date_str = request.form.get("event_date", "")
         if date_str:
             event.event_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
@@ -1128,6 +1333,9 @@ def add_post():
         published_at = request.form.get("published_at", "")
         language = request.form.get("language", "fr")
         tags = request.form.get("tags", "").strip()
+        seo_title = request.form.get("seo_title", "").strip()
+        seo_description = request.form.get("seo_description", "").strip()
+        seo_keywords = request.form.get("seo_keywords", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not body:
@@ -1139,6 +1347,9 @@ def add_post():
             body=body,
             language=language,
             tags=tags,
+            seo_title=seo_title or title,
+            seo_description=seo_description or body[:160],
+            seo_keywords=seo_keywords or tags,
             published_at=datetime.strptime(published_at, "%Y-%m-%dT%H:%M") if published_at else datetime.utcnow(),
         )
 
@@ -1165,6 +1376,9 @@ def edit_post(post_id: int):
         post.body = request.form.get("body", post.body)
         post.language = request.form.get("language", post.language)
         post.tags = request.form.get("tags", post.tags)
+        post.seo_title = request.form.get("seo_title", post.seo_title) or post.title
+        post.seo_description = request.form.get("seo_description", post.seo_description) or (post.body or "")[:160]
+        post.seo_keywords = request.form.get("seo_keywords", post.seo_keywords) or post.tags
         published_at = request.form.get("published_at", "")
         if published_at:
             post.published_at = datetime.strptime(published_at, "%Y-%m-%dT%H:%M")

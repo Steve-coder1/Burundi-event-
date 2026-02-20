@@ -21,6 +21,8 @@ Flask web application with:
 - Sponsors, Local Guides, and FAQs pages with filters and accordion interactions
 - Unified search and filter system across events, posts, and media with live API results
 - Advanced analytics tracking (views, unique visitors, content performance, referrals, CSV export)
+- SEO-ready metadata (dynamic title/description/keywords), Open Graph tags, canonical/alternate language links, and structured data for events/posts
+- Auto-generated `sitemap.xml` and `robots.txt` for search engine discovery
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -52,3 +54,5 @@ python app.py
 - FAQs page: `http://localhost:5000/kirundi/faqs`
 - Search page: `http://localhost:5000/kirundi/search`
 - Analytics dashboard: `http://localhost:5000/admin/analytics`
+- Sitemap: `http://localhost:5000/sitemap.xml`
+- Robots: `http://localhost:5000/robots.txt`
