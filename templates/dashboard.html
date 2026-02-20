@@ -1,0 +1,36 @@
+{% extends 'base_admin.html' %}
+{% block content %}
+<h1>Dashboard Home</h1>
+<div class="grid stats-grid">
+  <article class="card"><h3>Total Events</h3><p>{{ stats.events }}</p></article>
+  <article class="card"><h3>Total Posts</h3><p>{{ stats.posts }}</p></article>
+  <article class="card"><h3>Total Media</h3><p>{{ stats.media }}</p></article>
+  <article class="card"><h3>Total Categories</h3><p>{{ stats.categories }}</p></article>
+</div>
+
+<section class="card">
+  <h2>Quick Actions</h2>
+  <div class="quick-links">
+    <a class="btn" href="{{ url_for('add_event') }}">Add Event</a>
+    <a class="btn" href="{{ url_for('add_post') }}">Add Post</a>
+    <a class="btn" href="{{ url_for('manage_categories') }}">Manage Categories</a>
+    <a class="btn" href="{{ url_for('media_library') }}">Upload Media</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Top Pages</h2>
+  <table>
+    <thead><tr><th>Page</th><th>Views</th><th>Popularity</th></tr></thead>
+    <tbody>
+      {% for row in top_pages %}
+      <tr>
+        <td>{{ row.page }}</td>
+        <td>{{ row.views }}</td>
+        <td>{{ '%.1f'|format(row.popularity_score) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

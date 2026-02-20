@@ -1,0 +1,22 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<article class="detail-wrap">
+  <a href="{{ url_for('home') }}">← Back to events</a>
+  <h1>{{ event.title }}</h1>
+  <p><strong>Date:</strong> {{ event.event_date.strftime('%Y-%m-%d %H:%M') }}</p>
+  <p><strong>Category:</strong> {{ event.categories | map(attribute='name') | join(', ') }}</p>
+  <p>{{ event.description }}</p>
+
+  <div class="media-grid">
+    {% for item in gallery %}
+      <article class="card media-item">
+      {% if item.media_type == 'image' %}
+        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ event.title }}">
+      {% else %}
+        <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+      {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+</article>
+{% endblock %}

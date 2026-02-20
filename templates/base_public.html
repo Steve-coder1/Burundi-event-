@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or 'Burundi Events' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="public-page">
+  <header class="public-header">
+    <div class="logo">Burundi Events</div>
+    <button class="menu-toggle" id="menu-toggle">☰</button>
+    <nav id="public-nav">
+      <a href="{{ url_for('home') }}">Home</a>
+      <a href="{{ url_for('home') }}#events-grid">Events</a>
+      <a href="{{ url_for('home') }}#blog-highlights">Blog</a>
+      <a href="{{ url_for('home') }}#media">Media</a>
+      <a href="{{ url_for('home') }}#about">About</a>
+      <a href="{{ url_for('home') }}#contact">Contact</a>
+      <a href="{{ url_for('login') }}">Admin</a>
+    </nav>
+    <div class="lang-switch">
+      <a href="{{ url_for('set_language', lang='rn') }}" class="{{ 'active' if current_public_lang == 'rn' else '' }}">Kirundi</a>
+      <a href="{{ url_for('set_language', lang='fr') }}" class="{{ 'active' if current_public_lang == 'fr' else '' }}">Français</a>
+    </div>
+  </header>
+
+  <main class="public-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="alerts">
+        {% for category, message in messages %}
+          <div class="alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="public-footer" id="contact">
+    <p>Follow us: <a href="#">Instagram</a> · <a href="#">Facebook</a> · <a href="#">X</a></p>
+    <p>Email: contact@burundi-events.bi · +257 00 000 000</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

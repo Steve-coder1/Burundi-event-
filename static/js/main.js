@@ -1,0 +1,65 @@
+const previewInputs = document.querySelectorAll('[data-preview-target]');
+previewInputs.forEach((input) => {
+  const target = document.querySelector(input.dataset.previewTarget);
+  if (!target) return;
+  const render = () => {
+    target.textContent = input.value || 'Start typing to preview content...';
+  };
+  input.addEventListener('input', render);
+  render();
+});
+
+const uploadForm = document.getElementById('upload-form');
+if (uploadForm) {
+  const fileInput = uploadForm.querySelector('input[type="file"]');
+  uploadForm.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    uploadForm.classList.add('dragging');
+  });
+  uploadForm.addEventListener('dragleave', () => uploadForm.classList.remove('dragging'));
+  uploadForm.addEventListener('drop', (event) => {
+    event.preventDefault();
+    uploadForm.classList.remove('dragging');
+    fileInput.files = event.dataTransfer.files;
+  });
+}
+
+const menuToggle = document.getElementById('menu-toggle');
+const publicNav = document.getElementById('public-nav');
+if (menuToggle && publicNav) {
+  menuToggle.addEventListener('click', () => publicNav.classList.toggle('open'));
+}
+
+const eventGrid = document.getElementById('event-grid');
+const searchInput = document.getElementById('event-search');
+const categoryFilter = document.getElementById('event-category-filter');
+const sortSelect = document.getElementById('event-sort');
+
+function filterPublicEvents() {
+  if (!eventGrid) return;
+  const cards = Array.from(eventGrid.querySelectorAll('.event-card'));
+  const searchValue = (searchInput?.value || '').toLowerCase().trim();
+  const categoryValue = categoryFilter?.value || '';
+  const sortValue = sortSelect?.value || 'asc';
+
+  cards.forEach((card) => {
+    const matchesSearch = card.dataset.title.includes(searchValue);
+    const matchesCategory = !categoryValue || card.dataset.category === categoryValue;
+    card.style.display = matchesSearch && matchesCategory ? 'block' : 'none';
+  });
+
+  cards.sort((a, b) => {
+    const firstDate = new Date(a.dataset.date);
+    const secondDate = new Date(b.dataset.date);
+    return sortValue === 'asc' ? firstDate - secondDate : secondDate - firstDate;
+  });
+
+  cards.forEach((card) => eventGrid.appendChild(card));
+}
+
+[searchInput, categoryFilter, sortSelect].forEach((node) => {
+  if (node) {
+    node.addEventListener('input', filterPublicEvents);
+    node.addEventListener('change', filterPublicEvents);
+  }
+});
