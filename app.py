@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import smtplib
 from datetime import datetime
+from email.message import EmailMessage
 from functools import wraps
 from uuid import uuid4
 
@@ -106,6 +108,15 @@ class Analytics(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ContactMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(160), nullable=False)
+    phone = db.Column(db.String(50), nullable=True)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # Relation helpers
 Event.categories = db.relationship(
     "Category",
@@ -188,6 +199,36 @@ def build_post_card(post: Post) -> dict:
         "image": get_post_image(post.id),
         "tags": [tag.strip() for tag in (post.tags or "").split(",") if tag.strip()],
     }
+
+
+
+def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple[bool, str]:
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    admin_email = os.environ.get("ADMIN_CONTACT_EMAIL")
+
+    if not smtp_host or not admin_email:
+        return False, "SMTP is not configured. Message saved for admin review."
+
+    mail = EmailMessage()
+    mail["Subject"] = f"New Contact Message from {name}"
+    mail["From"] = smtp_username or admin_email
+    mail["To"] = admin_email
+    mail.set_content(
+        f"Name: {name}\nEmail: {email}\nPhone: {phone or 'N/A'}\n\nMessage:\n{message}"
+    )
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            if smtp_username and smtp_password:
+                server.login(smtp_username, smtp_password)
+            server.send_message(mail)
+        return True, "Message sent successfully."
+    except Exception:
+        return False, "Message saved, but email delivery failed."
 
 
 @app.context_processor
@@ -289,6 +330,40 @@ def set_language(lang: str):
     if lang in {"rn", "fr"}:
         session["public_lang"] = "rn" if lang == "rn" else "fr"
     return redirect(request.referrer or url_for("home"))
+
+
+@app.route("/about")
+def about_page():
+    increment_analytics("about", 0.4)
+    highlighted_regions = [
+        "Bujumbura waterfront venues",
+        "Gitega cultural centers",
+        "Ngozi youth and university hubs",
+    ]
+    return render_template("about.html", highlighted_regions=highlighted_regions)
+
+
+@app.route("/contact", methods=["GET", "POST"])
+def contact_page():
+    increment_analytics("contact", 0.6)
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+        message = request.form.get("message", "").strip()
+
+        if not name or not email or not message:
+            flash("Name, email, and message are required.", "danger")
+            return render_template("contact.html")
+
+        db.session.add(ContactMessage(name=name, email=email, phone=phone or None, message=message))
+        db.session.commit()
+
+        sent, feedback = send_contact_email(name, email, phone, message)
+        flash(feedback, "success" if sent else "warning")
+        return redirect(url_for("contact_page"))
+
+    return render_template("contact.html")
 
 
 @app.route("/blog")
@@ -580,6 +655,13 @@ def delete_post(post_id: int):
     db.session.commit()
     flash("Post deleted.", "info")
     return redirect(url_for("posts_list"))
+
+
+@app.route("/admin/messages")
+@login_required
+def admin_messages():
+    messages = ContactMessage.query.order_by(ContactMessage.created_at.desc()).all()
+    return render_template("messages.html", messages=messages)
 
 
 @app.route("/admin/categories", methods=["GET", "POST"])

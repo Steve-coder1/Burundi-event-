@@ -1,0 +1,32 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero about-hero">
+  <div class="hero-overlay">
+    <h1>About Burundi Events</h1>
+    <p>Connecting communities through trusted local events, stories, and cultural moments.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Our Story</h2>
+  <p>Burundi Events exists to make it easier for people to discover meaningful events near them. We curate local happenings, community meetups, performances, and cultural gatherings so visitors can quickly find what matters.</p>
+  <p>Events are selected from organizers, local partners, and verified submissions, then reviewed by our editorial team before publishing.</p>
+</section>
+
+<section class="card">
+  <h2>Local Community Context</h2>
+  <p>Burundi has a vibrant event scene driven by culture, faith communities, education, and youth initiatives. We spotlight diverse spaces where communities connect.</p>
+  <ul>
+    {% for region in highlighted_regions %}
+    <li>{{ region }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Team & Admin Contacts</h2>
+  <p><strong>Editorial Lead:</strong> Aline N., Community Storytelling</p>
+  <p><strong>Partnerships:</strong> Eric M., Local Events Outreach</p>
+  <p><strong>Operations:</strong> Admin Desk, content moderation and publishing</p>
+</section>
+{% endblock %}

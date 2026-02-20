@@ -14,6 +14,8 @@ Flask web application with:
 - Blog highlights section and footer contact/social links
 - Dedicated Blog/News listing with search/filter, category widgets, and pagination
 - Individual blog post pages with media, tags, and related post recommendations
+- About and Contact public pages with community context and local trust info
+- Contact form with server-side persistence and optional SMTP email delivery
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -36,3 +38,5 @@ python app.py
 - Admin login: `http://localhost:5000/admin/login`
 
 - Public blog: `http://localhost:5000/blog`
+- About page: `http://localhost:5000/about`
+- Contact page: `http://localhost:5000/contact`

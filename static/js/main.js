@@ -127,3 +127,29 @@ function filterBlogPosts() {
     node.addEventListener('change', filterBlogPosts);
   }
 });
+
+
+const contactForm = document.getElementById('contact-form');
+if (contactForm) {
+  contactForm.addEventListener('submit', (event) => {
+    const name = document.getElementById('contact-name')?.value.trim() || '';
+    const email = document.getElementById('contact-email')?.value.trim() || '';
+    const message = document.getElementById('contact-message')?.value.trim() || '';
+    const errorEl = document.getElementById('contact-error');
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let errorText = '';
+    if (!name || !email || !message) {
+      errorText = 'Please fill in name, email, and message.';
+    } else if (!emailPattern.test(email)) {
+      errorText = 'Please provide a valid email address.';
+    }
+
+    if (errorText) {
+      event.preventDefault();
+      if (errorEl) errorEl.textContent = errorText;
+    } else if (errorEl) {
+      errorEl.textContent = '';
+    }
+  });
+}
