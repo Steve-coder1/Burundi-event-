@@ -264,3 +264,113 @@ if (faqSearch && faqItems.length) {
     });
   });
 }
+
+
+const globalSearchInput = document.getElementById('global-search-input');
+const suggestionBox = document.getElementById('search-suggestions');
+const resultsMeta = document.getElementById('search-results-meta');
+const resultsGrid = document.getElementById('search-results');
+const searchLoadMore = document.getElementById('search-load-more');
+const searchFilters = {
+  content_type: document.getElementById('search-content-type'),
+  event_category: document.getElementById('search-event-category'),
+  post_category: document.getElementById('search-post-category'),
+  post_tag: document.getElementById('search-post-tag'),
+  media_type: document.getElementById('search-media-type'),
+  date_from: document.getElementById('search-date-from'),
+  date_to: document.getElementById('search-date-to'),
+  sort: document.getElementById('search-sort'),
+};
+
+let searchPage = 1;
+const searchPerPage = 12;
+
+function collectSearchParams() {
+  const params = new URLSearchParams();
+  params.set('page', String(searchPage));
+  params.set('per_page', String(searchPerPage));
+  params.set('q', globalSearchInput?.value || '');
+  Object.entries(searchFilters).forEach(([key, node]) => {
+    if (node?.value) params.set(key, node.value);
+  });
+  return params;
+}
+
+function highlightKeyword(text, keyword) {
+  if (!keyword) return text;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(${escaped})`, 'ig');
+  return text.replace(re, '<mark>$1</mark>');
+}
+
+async function renderSearchResults(reset = true) {
+  if (!resultsGrid || !resultsMeta) return;
+  if (reset) {
+    searchPage = 1;
+    resultsGrid.innerHTML = '';
+  }
+
+  const params = collectSearchParams();
+  const response = await fetch(`/api/search?${params.toString()}`);
+  const data = await response.json();
+  const keyword = (globalSearchInput?.value || '').trim();
+
+  if (data.results.length === 0 && searchPage === 1) {
+    resultsGrid.innerHTML = '<p>No results found.</p>';
+  } else {
+    data.results.forEach((row) => {
+      const card = document.createElement('a');
+      card.className = 'event-card search-result-card';
+      card.href = row.url;
+      const thumb = row.thumbnail ? `<img src="${row.thumbnail}" alt="${row.title}">` : '<div class="image-placeholder">No image</div>';
+      card.innerHTML = `${thumb}<div class="event-card-body"><span class="badge">${row.content_type} · ${row.category}</span><h3>${highlightKeyword(row.title, keyword)}</h3><p>${row.date}</p><p>${highlightKeyword(row.description, keyword)}</p></div>`;
+      resultsGrid.appendChild(card);
+    });
+  }
+
+  resultsMeta.textContent = `Showing ${resultsGrid.querySelectorAll('.search-result-card').length} of ${data.total} results`;
+  if (searchLoadMore) searchLoadMore.style.display = data.has_next ? 'inline-block' : 'none';
+}
+
+async function updateSuggestions() {
+  if (!globalSearchInput || !suggestionBox) return;
+  const q = globalSearchInput.value.trim();
+  if (!q) {
+    suggestionBox.innerHTML = '';
+    return;
+  }
+  const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(q)}`);
+  const data = await response.json();
+  suggestionBox.innerHTML = data.suggestions
+    .map((item) => `<button type="button" class="suggestion-item">${item}</button>`)
+    .join('');
+  suggestionBox.querySelectorAll('.suggestion-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      globalSearchInput.value = btn.textContent || '';
+      suggestionBox.innerHTML = '';
+      renderSearchResults(true);
+    });
+  });
+}
+
+if (globalSearchInput && resultsGrid) {
+  globalSearchInput.addEventListener('input', async () => {
+    await updateSuggestions();
+    renderSearchResults(true);
+  });
+
+  Object.values(searchFilters).forEach((node) => {
+    if (node) {
+      node.addEventListener('change', () => renderSearchResults(true));
+    }
+  });
+
+  if (searchLoadMore) {
+    searchLoadMore.addEventListener('click', () => {
+      searchPage += 1;
+      renderSearchResults(false);
+    });
+  }
+
+  renderSearchResults(true);
+}

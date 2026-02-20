@@ -1,0 +1,80 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero search-hero">
+  <div class="hero-overlay">
+    <h1>Search & Filter</h1>
+    <p>Find events, blog posts, and media highlights in one place.</p>
+  </div>
+</section>
+
+<section class="card">
+  <div class="search-topbar">
+    <input type="text" id="global-search-input" placeholder="Search keyword..." autocomplete="off">
+    <div id="search-suggestions" class="suggestions"></div>
+  </div>
+</section>
+
+<details class="card" open>
+  <summary><strong>Filters</strong></summary>
+  <div class="grid search-filters">
+    <label>Content type
+      <select id="search-content-type">
+        <option value="">All</option>
+        <option value="event">Events</option>
+        <option value="post">Posts</option>
+        <option value="media">Media</option>
+      </select>
+    </label>
+    <label>Event category
+      <select id="search-event-category">
+        <option value="">All</option>
+        {% for category in event_categories %}
+        <option value="{{ category.name }}">{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Post category
+      <select id="search-post-category">
+        <option value="">All</option>
+        {% for category in post_categories %}
+        <option value="{{ category.name }}">{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Post tag
+      <select id="search-post-tag">
+        <option value="">All</option>
+        {% for tag in post_tags %}
+        <option value="{{ tag }}">{{ tag }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Media type
+      <select id="search-media-type">
+        <option value="">All</option>
+        <option value="image">Photos</option>
+        <option value="video">Videos</option>
+      </select>
+    </label>
+    <label>Date from
+      <input type="date" id="search-date-from">
+    </label>
+    <label>Date to
+      <input type="date" id="search-date-to">
+    </label>
+    <label>Sort
+      <select id="search-sort">
+        <option value="date_desc">Date: newest to oldest</option>
+        <option value="date_asc">Date: oldest to newest</option>
+        <option value="category_asc">Category A-Z</option>
+      </select>
+    </label>
+  </div>
+</details>
+
+<section class="card">
+  <div id="search-results-meta">Loading...</div>
+  <div id="search-results" class="blog-grid"></div>
+  <div class="center-row"><button class="btn" id="search-load-more" type="button">Load more</button></div>
+</section>
+{% endblock %}

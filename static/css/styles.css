@@ -121,3 +121,16 @@ th, td { border-bottom: 1px solid #e5e7eb; padding: .75rem; text-align: left; }
   .public-header nav { display: none; position: absolute; top: 55px; left: 0; right: 0; background: #1f2937; padding: .75rem 1rem; flex-direction: column; }
   .public-header nav.open { display: flex; }
 }
+
+
+.search-hero { min-height: 220px; }
+.search-topbar { position: relative; }
+.suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
+.suggestion-item { border: none; border-bottom: 1px solid #e5e7eb; background: #fff; text-align: left; width: 100%; padding: .55rem .65rem; cursor: pointer; }
+.suggestion-item:hover { background: #f8fafc; }
+.search-filters { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: .75rem; }
+.search-result-card mark { background: #fde68a; }
+@media (max-width: 900px) {
+  .search-topbar { position: static; }
+  .suggestions { position: static; margin-top: .35rem; }
+}

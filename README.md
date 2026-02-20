@@ -18,6 +18,7 @@ Flask web application with:
 - Contact form with server-side persistence and optional SMTP email delivery
 - Public media gallery with image/video grid, filters, lightbox, and load-more interactions
 - Sponsors, Local Guides, and FAQs pages with filters and accordion interactions
+- Unified search and filter system across events, posts, and media with live API results
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -46,3 +47,4 @@ python app.py
 - Sponsors page: `http://localhost:5000/sponsors`
 - Local guides page: `http://localhost:5000/guides`
 - FAQs page: `http://localhost:5000/faqs`
+- Search page: `http://localhost:5000/search`

@@ -10,6 +10,7 @@ from uuid import uuid4
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -264,6 +265,112 @@ def build_media_card(item: Media) -> dict:
     }
 
 
+
+def serialize_search_results(language: str) -> list[dict]:
+    rows: list[dict] = []
+
+    events = Event.query.filter(Event.language == language).all()
+    for event in events:
+        card = build_event_card(event)
+        rows.append(
+            {
+                "content_type": "event",
+                "id": event.id,
+                "title": card["title"],
+                "description": event.description,
+                "date": event.event_date.strftime("%Y-%m-%d"),
+                "category": card["category"],
+                "tags": card["tags"],
+                "media_type": "",
+                "url": url_for("event_detail", event_id=event.id),
+                "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
+            }
+        )
+
+    posts = Post.query.filter(Post.language == language).all()
+    for post in posts:
+        card = build_post_card(post)
+        rows.append(
+            {
+                "content_type": "post",
+                "id": post.id,
+                "title": card["title"],
+                "description": card["excerpt"],
+                "date": card["published"],
+                "category": card["category"],
+                "tags": card["tags"],
+                "media_type": "",
+                "url": url_for("blog_post_detail", post_id=post.id),
+                "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
+            }
+        )
+
+    media_items = [build_media_card(item) for item in Media.query.order_by(Media.uploaded_at.desc()).all()]
+    for media in media_items:
+        if media["linked_language"] != language:
+            continue
+        rows.append(
+            {
+                "content_type": "media",
+                "id": media["id"],
+                "title": media["linked_title"],
+                "description": f"{media['linked_type'].title()} media highlight",
+                "date": media["uploaded_at"],
+                "category": media["linked_category"],
+                "tags": [],
+                "media_type": media["media_type"],
+                "url": url_for("media_gallery"),
+                "thumbnail": url_for("static", filename=f"uploads/{media['filename']}"),
+            }
+        )
+
+    return rows
+
+
+def filter_search_results(rows: list[dict], params: dict) -> list[dict]:
+    keyword = params.get("q", "").strip().lower()
+    content_type = params.get("content_type", "")
+    event_category = params.get("event_category", "")
+    post_category = params.get("post_category", "")
+    post_tag = params.get("post_tag", "").strip().lower()
+    media_type = params.get("media_type", "")
+    date_from = params.get("date_from", "")
+    date_to = params.get("date_to", "")
+
+    filtered: list[dict] = []
+    for row in rows:
+        if content_type and row["content_type"] != content_type:
+            continue
+        if keyword and keyword not in f"{row['title']} {row['description']}".lower():
+            continue
+
+        if row["content_type"] == "event" and event_category and row["category"] != event_category:
+            continue
+        if row["content_type"] == "post" and post_category and row["category"] != post_category:
+            continue
+        if row["content_type"] == "post" and post_tag and post_tag not in ",".join(row["tags"]).lower():
+            continue
+        if row["content_type"] == "media" and media_type and row["media_type"] != media_type:
+            continue
+
+        if date_from and row["date"] < date_from:
+            continue
+        if date_to and row["date"] > date_to:
+            continue
+
+        filtered.append(row)
+
+    sort_by = params.get("sort", "date_desc")
+    if sort_by == "date_asc":
+        filtered.sort(key=lambda x: x["date"])
+    elif sort_by == "category_asc":
+        filtered.sort(key=lambda x: (x["category"], x["date"]), reverse=False)
+    else:
+        filtered.sort(key=lambda x: x["date"], reverse=True)
+
+    return filtered
+
+
 def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple[bool, str]:
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
@@ -461,6 +568,58 @@ def set_language(lang: str):
     if lang in {"rn", "fr"}:
         session["public_lang"] = "rn" if lang == "rn" else "fr"
     return redirect(request.referrer or url_for("home"))
+
+
+@app.route("/search")
+def search_page():
+    increment_analytics("search", 0.7)
+    current_lang = session.get("public_lang", "fr")
+    event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
+    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
+    post_tags = sorted({tag.strip() for p in Post.query.filter(Post.language == current_lang).all() for tag in (p.tags or "").split(",") if tag.strip()})
+    return render_template(
+        "search.html",
+        event_categories=event_categories,
+        post_categories=post_categories,
+        post_tags=post_tags,
+    )
+
+
+@app.route("/api/search")
+def api_search():
+    current_lang = session.get("public_lang", "fr")
+    rows = serialize_search_results(current_lang)
+    filtered = filter_search_results(rows, request.args)
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 12, type=int)
+    start = (page - 1) * per_page
+    end = start + per_page
+    payload = {
+        "results": filtered[start:end],
+        "total": len(filtered),
+        "page": page,
+        "per_page": per_page,
+        "has_next": end < len(filtered),
+    }
+    return jsonify(payload)
+
+
+@app.route("/api/autocomplete")
+def api_autocomplete():
+    current_lang = session.get("public_lang", "fr")
+    q = request.args.get("q", "").strip().lower()
+    if not q:
+        return jsonify({"suggestions": []})
+
+    titles = [row["title"] for row in serialize_search_results(current_lang)]
+    seen = []
+    for title in titles:
+        if q in title.lower() and title not in seen:
+            seen.append(title)
+        if len(seen) >= 8:
+            break
+    return jsonify({"suggestions": seen})
 
 
 @app.route("/gallery")
