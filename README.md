@@ -9,7 +9,8 @@ Flask web application with:
 - Hero banner with featured event and CTA
 - Upcoming events card grid with hover effects
 - Real-time client-side search/filter/sort interactions
-- Event detail page with gallery
+- Event detail page with full metadata (location, date/time, category, tags)
+- Lightbox gallery and related-event suggestions
 - Blog highlights section and footer contact/social links
 
 ## Admin highlights

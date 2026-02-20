@@ -2,21 +2,73 @@
 {% block content %}
 <article class="detail-wrap">
   <a href="{{ url_for('home') }}">← Back to events</a>
-  <h1>{{ event.title }}</h1>
-  <p><strong>Date:</strong> {{ event.event_date.strftime('%Y-%m-%d %H:%M') }}</p>
-  <p><strong>Category:</strong> {{ event.categories | map(attribute='name') | join(', ') }}</p>
-  <p>{{ event.description }}</p>
 
-  <div class="media-grid">
-    {% for item in gallery %}
-      <article class="card media-item">
-      {% if item.media_type == 'image' %}
-        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ event.title }}">
+  <section class="event-hero-detail" style="background-image: url('{{ url_for('static', filename='uploads/' + gallery[0].filename) if gallery and gallery[0].media_type == 'image' else '' }}');">
+    <div class="hero-overlay">
+      <span class="badge">{{ event.categories[0].name if event.categories else 'General' }}</span>
+      <h1>{{ event.title }}</h1>
+      <p>{{ event.event_date.strftime('%Y-%m-%d %H:%M') }} · {{ event.location or 'TBD' }}</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Event Details</h2>
+    <p>{{ event.description }}</p>
+    <p><strong>Location:</strong> {{ event.location or 'TBD' }}</p>
+    <p><strong>Time & Date:</strong> {{ event.event_date.strftime('%Y-%m-%d %H:%M') }}</p>
+    {% if event.tags %}
+      <div class="tag-row">
+        {% for tag in event.tags.split(',') if tag.strip() %}
+          <span class="badge">#{{ tag.strip() }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Gallery</h2>
+    <div class="gallery-grid">
+      {% for item in gallery %}
+      <button class="gallery-thumb" type="button" data-lightbox-src="{{ url_for('static', filename='uploads/' + item.filename) }}" data-lightbox-type="{{ item.media_type }}">
+        {% if item.media_type == 'image' %}
+          <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ event.title }}">
+        {% else %}
+          <video muted>
+            <source src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+          </video>
+        {% endif %}
+      </button>
       {% else %}
-        <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-      {% endif %}
-      </article>
-    {% endfor %}
-  </div>
+      <p>No media uploaded for this event yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Related Events</h2>
+    <div class="event-grid">
+      {% for card in related_events %}
+      <a href="{{ url_for('event_detail', event_id=card.id) }}" class="event-card">
+        {% if card.image %}
+        <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
+        {% else %}
+        <div class="image-placeholder">No image</div>
+        {% endif %}
+        <div class="event-card-body">
+          <span class="badge">{{ card.category }}</span>
+          <h3>{{ card.title }}</h3>
+          <p>{{ card.date }} · {{ card.time }}</p>
+        </div>
+      </a>
+      {% else %}
+      <p>No related events available.</p>
+      {% endfor %}
+    </div>
+  </section>
 </article>
+
+<div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+  <button class="lightbox-close" type="button" id="lightbox-close">×</button>
+  <div id="lightbox-content"></div>
+</div>
 {% endblock %}

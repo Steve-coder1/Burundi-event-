@@ -63,3 +63,42 @@ function filterPublicEvents() {
     node.addEventListener('change', filterPublicEvents);
   }
 });
+
+const lightbox = document.getElementById('lightbox');
+const lightboxContent = document.getElementById('lightbox-content');
+const lightboxClose = document.getElementById('lightbox-close');
+const galleryThumbs = document.querySelectorAll('[data-lightbox-src]');
+
+function closeLightbox() {
+  if (!lightbox || !lightboxContent) return;
+  lightbox.classList.add('hidden');
+  lightboxContent.innerHTML = '';
+}
+
+if (lightbox && lightboxContent) {
+  galleryThumbs.forEach((thumb) => {
+    thumb.addEventListener('click', () => {
+      const src = thumb.dataset.lightboxSrc;
+      const type = thumb.dataset.lightboxType;
+      if (!src) return;
+      if (type === 'video') {
+        lightboxContent.innerHTML = `<video controls autoplay><source src="${src}"></video>`;
+      } else {
+        lightboxContent.innerHTML = `<img src="${src}" alt="Gallery item">`;
+      }
+      lightbox.classList.remove('hidden');
+    });
+  });
+
+  lightbox.addEventListener('click', (event) => {
+    if (event.target === lightbox) closeLightbox();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeLightbox();
+  });
+}
+
+if (lightboxClose) {
+  lightboxClose.addEventListener('click', closeLightbox);
+}

@@ -13,7 +13,14 @@
       <select name="language">
         <option value="en" {% if event and event.language == 'en' %}selected{% endif %}>English</option>
         <option value="fr" {% if event and event.language == 'fr' %}selected{% endif %}>French</option>
+        <option value="rn" {% if event and event.language == 'rn' %}selected{% endif %}>Kirundi</option>
       </select>
+    </label>
+    <label>Location
+      <input name="location" value="{{ event.location if event else '' }}" placeholder="Bujumbura Downtown, Avenue ...">
+    </label>
+    <label>Tags (comma separated)
+      <input name="tags" value="{{ event.tags if event else '' }}" placeholder="music, youth, culture">
     </label>
     <label>Categories
       <select name="categories" multiple size="5">

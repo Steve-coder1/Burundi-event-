@@ -60,6 +60,8 @@ class Event(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     event_date = db.Column(db.DateTime, nullable=False)
+    location = db.Column(db.String(200), default="TBD")
+    tags = db.Column(db.String(255), default="")
     language = db.Column(db.String(10), default="en")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -148,6 +150,21 @@ def get_event_image(event_id: int) -> str | None:
     return media.filename if media else None
 
 
+def build_event_card(event: Event) -> dict:
+    return {
+        "id": event.id,
+        "title": event.title,
+        "date": event.event_date.strftime("%Y-%m-%d"),
+        "time": event.event_date.strftime("%H:%M"),
+        "category": event.categories[0].name if event.categories else "General",
+        "category_id": event.categories[0].id if event.categories else 0,
+        "image": get_event_image(event.id),
+        "description": event.description,
+        "location": event.location or "TBD",
+        "tags": [tag.strip() for tag in (event.tags or "").split(",") if tag.strip()],
+    }
+
+
 @app.context_processor
 def inject_globals():
     return {
@@ -191,19 +208,7 @@ def home():
     query = query.order_by(Event.event_date.asc() if sort_order == "asc" else Event.event_date.desc())
     events = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    cards = []
-    for event in events.items:
-        cards.append(
-            {
-                "id": event.id,
-                "title": event.title,
-                "date": event.event_date.strftime("%Y-%m-%d"),
-                "category": event.categories[0].name if event.categories else "General",
-                "category_id": event.categories[0].id if event.categories else 0,
-                "image": get_event_image(event.id),
-                "description": event.description,
-            }
-        )
+    cards = [build_event_card(event) for event in events.items]
 
     featured_event = cards[0] if cards else None
     blog_highlights = Post.query.order_by(Post.published_at.desc()).limit(3).all()
@@ -227,7 +232,17 @@ def public_events():
 def event_detail(event_id: int):
     event = Event.query.get_or_404(event_id)
     gallery = Media.query.filter_by(linked_type="event", linked_id=event.id).order_by(Media.uploaded_at.desc()).all()
-    return render_template("event_detail.html", event=event, gallery=gallery)
+
+    related_query = Event.query.filter(Event.id != event.id, Event.language == event.language)
+    if event.categories:
+        cat_ids = [category.id for category in event.categories]
+        related_query = related_query.join(EventCategory, Event.id == EventCategory.event_id).filter(
+            EventCategory.category_id.in_(cat_ids)
+        )
+    related_events = related_query.order_by(Event.event_date.asc()).limit(6).all()
+    related_cards = [build_event_card(item) for item in related_events]
+
+    return render_template("event_detail.html", event=event, gallery=gallery, related_events=related_cards)
 
 
 @app.route("/set-language/<lang>")
@@ -309,6 +324,8 @@ def add_event():
         description = request.form.get("description", "").strip()
         date_str = request.form.get("event_date", "")
         language = request.form.get("language", "en")
+        location = request.form.get("location", "").strip() or "TBD"
+        tags = request.form.get("tags", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not description or not date_str:
@@ -320,6 +337,8 @@ def add_event():
             description=description,
             event_date=datetime.strptime(date_str, "%Y-%m-%dT%H:%M"),
             language=language,
+            location=location,
+            tags=tags,
         )
 
         for cid in selected_ids:
@@ -344,6 +363,8 @@ def edit_event(event_id: int):
         event.title = request.form.get("title", event.title)
         event.description = request.form.get("description", event.description)
         event.language = request.form.get("language", event.language)
+        event.location = request.form.get("location", event.location)
+        event.tags = request.form.get("tags", event.tags)
         date_str = request.form.get("event_date", "")
         if date_str:
             event.event_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
