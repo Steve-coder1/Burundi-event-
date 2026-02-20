@@ -1,0 +1,34 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero sponsors-hero">
+  <div class="hero-overlay">
+    <h1>Sponsors & Partners</h1>
+    <p>Organizations supporting local events and communities.</p>
+  </div>
+</section>
+
+<section class="card">
+  <form method="get" class="filters" id="sponsor-filter-form">
+    <select name="type" id="sponsor-type-filter">
+      <option value="">All partner types</option>
+      {% for sponsor_type in sponsor_types %}
+      <option value="{{ sponsor_type }}" {% if request.args.get('type') == sponsor_type %}selected{% endif %}>{{ sponsor_type|title }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn" type="submit">Filter</button>
+  </form>
+</section>
+
+<section class="sponsor-grid" id="sponsor-grid">
+  {% for sponsor in sponsors %}
+  <a href="{{ sponsor.website_url }}" class="card sponsor-card" target="_blank" rel="noopener" data-sponsor-type="{{ sponsor.sponsor_type }}">
+    <div class="sponsor-logo">{{ sponsor.name[:2]|upper }}</div>
+    <h3>{{ sponsor.name }}</h3>
+    <p>{{ sponsor.description }}</p>
+    <small>{{ sponsor.sponsor_type|title }}</small>
+  </a>
+  {% else %}
+  <p>No sponsors available.</p>
+  {% endfor %}
+</section>
+{% endblock %}

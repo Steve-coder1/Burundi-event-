@@ -17,6 +17,7 @@ Flask web application with:
 - About and Contact public pages with community context and local trust info
 - Contact form with server-side persistence and optional SMTP email delivery
 - Public media gallery with image/video grid, filters, lightbox, and load-more interactions
+- Sponsors, Local Guides, and FAQs pages with filters and accordion interactions
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -42,3 +43,6 @@ python app.py
 - About page: `http://localhost:5000/about`
 - Contact page: `http://localhost:5000/contact`
 - Media gallery: `http://localhost:5000/gallery`
+- Sponsors page: `http://localhost:5000/sponsors`
+- Local guides page: `http://localhost:5000/guides`
+- FAQs page: `http://localhost:5000/faqs`

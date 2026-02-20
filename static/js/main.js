@@ -217,3 +217,50 @@ if (galleryLoadMore) {
 }
 
 applyPublicGalleryFilters();
+
+
+const sponsorTypeFilter = document.getElementById('sponsor-type-filter');
+const sponsorCards = document.querySelectorAll('.sponsor-card');
+if (sponsorTypeFilter && sponsorCards.length) {
+  sponsorTypeFilter.addEventListener('change', () => {
+    const selected = sponsorTypeFilter.value;
+    sponsorCards.forEach((card) => {
+      const show = !selected || card.dataset.sponsorType === selected;
+      card.style.display = show ? 'block' : 'none';
+    });
+  });
+}
+
+const guidesTypeFilter = document.getElementById('guides-type-filter');
+const guideCards = document.querySelectorAll('.guide-card');
+if (guidesTypeFilter && guideCards.length) {
+  guidesTypeFilter.addEventListener('change', () => {
+    const selected = guidesTypeFilter.value;
+    guideCards.forEach((card) => {
+      const show = !selected || card.dataset.guideType === selected;
+      card.style.display = show ? 'block' : 'none';
+    });
+  });
+}
+
+const faqItems = document.querySelectorAll('.faq-item');
+faqItems.forEach((item) => {
+  const question = item.querySelector('.faq-question');
+  const answer = item.querySelector('.faq-answer');
+  if (!question || !answer) return;
+  question.addEventListener('click', () => {
+    answer.classList.toggle('hidden');
+    question.classList.toggle('open');
+  });
+});
+
+const faqSearch = document.getElementById('faq-search');
+if (faqSearch && faqItems.length) {
+  faqSearch.addEventListener('input', () => {
+    const keyword = faqSearch.value.toLowerCase().trim();
+    faqItems.forEach((item) => {
+      const hay = item.dataset.faqText || '';
+      item.style.display = !keyword || hay.includes(keyword) ? 'block' : 'none';
+    });
+  });
+}

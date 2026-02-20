@@ -1,0 +1,33 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero guides-hero">
+  <div class="hero-overlay">
+    <h1>Local Guides</h1>
+    <p>Travel tips, venue recommendations, and event etiquette.</p>
+  </div>
+</section>
+
+<section class="card">
+  <form method="get" class="filters" id="guides-filter-form">
+    <select name="type" id="guides-type-filter">
+      <option value="">All guide categories</option>
+      {% for guide_type in guide_types %}
+      <option value="{{ guide_type }}" {% if request.args.get('type') == guide_type %}selected{% endif %}>{{ guide_type|title }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn" type="submit">Filter</button>
+  </form>
+</section>
+
+<section class="blog-grid" id="guides-grid">
+  {% for guide in guides %}
+  <article class="card guide-card" data-guide-type="{{ guide.guide_type }}">
+    <span class="badge">{{ guide.guide_type|title }}</span>
+    <h3>{{ guide.title }}</h3>
+    <p>{{ guide.content }}</p>
+  </article>
+  {% else %}
+  <p>No guides available.</p>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -117,6 +117,35 @@ class ContactMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Sponsor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(140), nullable=False)
+    website_url = db.Column(db.String(255), nullable=False)
+    logo_url = db.Column(db.String(255), nullable=True)
+    description = db.Column(db.String(255), default="")
+    sponsor_type = db.Column(db.String(50), default="community")
+    language = db.Column(db.String(10), default="fr")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class LocalGuide(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    guide_type = db.Column(db.String(50), default="community")
+    image_url = db.Column(db.String(255), nullable=True)
+    language = db.Column(db.String(10), default="fr")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FAQ(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.String(255), nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    language = db.Column(db.String(10), default="fr")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # Relation helpers
 Event.categories = db.relationship(
     "Category",
@@ -296,6 +325,75 @@ def ensure_seed_data():
         db.session.add(admin)
         db.session.commit()
 
+    if Sponsor.query.count() == 0:
+        db.session.add_all(
+            [
+                Sponsor(
+                    name="Burundi Creative Hub",
+                    website_url="https://example.org/creative-hub",
+                    logo_url="",
+                    description="Supports youth-led music and arts programs.",
+                    sponsor_type="arts",
+                    language="fr",
+                ),
+                Sponsor(
+                    name="Lake Tanganyika Sports",
+                    website_url="https://example.org/lake-sports",
+                    logo_url="",
+                    description="Partner for community sports festivals.",
+                    sponsor_type="sports",
+                    language="fr",
+                ),
+            ]
+        )
+
+    if LocalGuide.query.count() == 0:
+        db.session.add_all(
+            [
+                LocalGuide(
+                    title="Best Evening Venues in Bujumbura",
+                    content="Look for venues near the waterfront and arrive early during festival nights.",
+                    guide_type="music",
+                    language="fr",
+                ),
+                LocalGuide(
+                    title="Community Event Etiquette",
+                    content="Respect local customs, support local vendors, and keep public spaces clean.",
+                    guide_type="community",
+                    language="fr",
+                ),
+                LocalGuide(
+                    title="Getting Around for Sports Events",
+                    content="Use trusted taxi points and plan return transport before late matches.",
+                    guide_type="sports",
+                    language="fr",
+                ),
+            ]
+        )
+
+    if FAQ.query.count() == 0:
+        db.session.add_all(
+            [
+                FAQ(
+                    question="How are events selected?",
+                    answer="Events are reviewed from local organizers and verified before publication.",
+                    language="fr",
+                ),
+                FAQ(
+                    question="Can I submit my event?",
+                    answer="Yes. Use the contact form with event details and your team will review it.",
+                    language="fr",
+                ),
+                FAQ(
+                    question="Are events free to attend?",
+                    answer="Some are free and others are ticketed. Check each event detail page for guidance.",
+                    language="fr",
+                ),
+            ]
+        )
+
+    db.session.commit()
+
 
 @app.route("/")
 def index():
@@ -400,6 +498,55 @@ def media_gallery():
         event_options=event_options,
         category_options=category_options,
     )
+
+
+@app.route("/sponsors")
+def sponsors_page():
+    increment_analytics("sponsors", 0.5)
+    selected_type = request.args.get("type", "")
+    current_lang = session.get("public_lang", "fr")
+
+    query = Sponsor.query.filter(Sponsor.language == current_lang)
+    if selected_type:
+        query = query.filter(Sponsor.sponsor_type == selected_type)
+
+    sponsors = query.order_by(Sponsor.name.asc()).all()
+    sponsor_types = sorted({row.sponsor_type for row in Sponsor.query.filter(Sponsor.language == current_lang).all()})
+    return render_template("sponsors.html", sponsors=sponsors, sponsor_types=sponsor_types)
+
+
+@app.route("/guides")
+def guides_page():
+    increment_analytics("guides", 0.5)
+    selected_type = request.args.get("type", "")
+    current_lang = session.get("public_lang", "fr")
+
+    query = LocalGuide.query.filter(LocalGuide.language == current_lang)
+    if selected_type:
+        query = query.filter(LocalGuide.guide_type == selected_type)
+
+    guides = query.order_by(LocalGuide.created_at.desc()).all()
+    guide_types = sorted({row.guide_type for row in LocalGuide.query.filter(LocalGuide.language == current_lang).all()})
+    return render_template("guides.html", guides=guides, guide_types=guide_types)
+
+
+@app.route("/faqs")
+def faqs_page():
+    increment_analytics("faqs", 0.5)
+    keyword = request.args.get("q", "").strip().lower()
+    current_lang = session.get("public_lang", "fr")
+
+    query = FAQ.query.filter(FAQ.language == current_lang)
+    if keyword:
+        query = query.filter(
+            db.or_(
+                FAQ.question.ilike(f"%{keyword}%"),
+                FAQ.answer.ilike(f"%{keyword}%"),
+            )
+        )
+
+    faqs = query.order_by(FAQ.created_at.desc()).all()
+    return render_template("faqs.html", faqs=faqs)
 
 
 @app.route("/about")
