@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Analytics Overview</h1>
+<div class="grid two-col">
+  <section class="card">
+    <h3>Page Views</h3>
+    <canvas id="viewsChart"></canvas>
+  </section>
+  <section class="card">
+    <h3>Popularity</h3>
+    <canvas id="popularityChart"></canvas>
+  </section>
+</div>
+<section class="card">
+  <table>
+    <thead><tr><th>Page</th><th>Views</th><th>Popularity Score</th><th>Updated</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.page }}</td>
+        <td>{{ row.views }}</td>
+        <td>{{ '%.2f'|format(row.popularity_score) }}</td>
+        <td>{{ row.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const labels = {{ labels | tojson }};
+  const viewValues = {{ view_values | tojson }};
+  const popularityValues = {{ popularity_values | tojson }};
+
+  new Chart(document.getElementById('viewsChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Views', data: viewValues, backgroundColor: '#3b82f6' }] }
+  });
+
+  new Chart(document.getElementById('popularityChart'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Popularity', data: popularityValues, borderColor: '#10b981', tension: 0.25 }] }
+  });
+</script>
+{% endblock %}

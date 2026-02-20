@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or 'Admin Dashboard' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  {% if session.get('admin_user') %}
+  <aside class="sidebar">
+    <h2>Admin</h2>
+    <a href="{{ url_for('dashboard') }}">Home</a>
+    <a href="{{ url_for('events_list') }}">Events</a>
+    <a href="{{ url_for('posts_list') }}">Blog Posts</a>
+    <a href="{{ url_for('manage_categories') }}">Categories</a>
+    <a href="{{ url_for('media_library') }}">Media Library</a>
+    <a href="{{ url_for('analytics') }}">Analytics</a>
+    <a href="{{ url_for('logout') }}">Logout</a>
+  </aside>
+  {% endif %}
+
+  <main class="container {% if not session.get('admin_user') %}login-container{% endif %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="alerts">
+        {% for category, message in messages %}
+          <div class="alert {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

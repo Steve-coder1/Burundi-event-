@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="title-row">
+  <h1>Events Management</h1>
+  <a class="btn" href="{{ url_for('add_event') }}">Add Event</a>
+</div>
+<form method="get" class="filters">
+  <input type="text" name="keyword" placeholder="Search keyword" value="{{ request.args.get('keyword', '') }}">
+  <input type="date" name="date" value="{{ request.args.get('date', '') }}">
+  <select name="category">
+    <option value="">All categories</option>
+    {% for category in event_categories %}
+      <option value="{{ category.id }}" {% if request.args.get('category') == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn" type="submit">Filter</button>
+</form>
+<table>
+  <thead><tr><th>Title</th><th>Date</th><th>Language</th><th>Categories</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.title }}</td>
+      <td>{{ event.event_date.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ event.language }}</td>
+      <td>{{ event.categories | map(attribute='name') | join(', ') }}</td>
+      <td>
+        <a href="{{ url_for('edit_event', event_id=event.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('delete_event', event_id=event.id) }}" class="inline" onsubmit="return confirm('Delete event?');">
+          <button type="submit" class="text-btn">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
