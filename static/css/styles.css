@@ -1,0 +1,49 @@
+:root {
+  --bg: #f4f6fb;
+  --card: #fff;
+  --accent: #2563eb;
+  --text: #1f2937;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; background: var(--bg); color: var(--text); display: flex; }
+.sidebar {
+  width: 230px;
+  background: #111827;
+  min-height: 100vh;
+  padding: 1.5rem 1rem;
+  position: sticky;
+  top: 0;
+}
+.sidebar h2 { color: #fff; }
+.sidebar a { color: #d1d5db; display: block; padding: .55rem .5rem; text-decoration: none; border-radius: 6px; }
+.sidebar a:hover { background: #1f2937; color: #fff; }
+.container { flex: 1; padding: 1.5rem; }
+.login-container { margin: auto; max-width: 480px; }
+.card { background: var(--card); border-radius: 10px; padding: 1rem; box-shadow: 0 8px 18px rgba(0,0,0,.07); margin-bottom: 1rem; }
+.grid { display: grid; gap: 1rem; }
+.stats-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.two-col { grid-template-columns: 2fr 1fr; }
+.form-grid label { display: block; margin-bottom: .75rem; font-weight: 600; }
+input, textarea, select, button { width: 100%; padding: .55rem; margin-top: .35rem; border-radius: 6px; border: 1px solid #cbd5e1; }
+.btn { background: var(--accent); color: #fff; border: none; cursor: pointer; text-decoration: none; display: inline-block; width: auto; padding: .55rem .9rem; }
+.btn:hover { opacity: .9; }
+.text-btn { border: none; background: none; color: #dc2626; cursor: pointer; padding: 0; }
+.title-row, .filters, .form-inline, .quick-links { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.filters input, .filters select { width: auto; }
+table { width: 100%; background: #fff; border-collapse: collapse; }
+th, td { border-bottom: 1px solid #e5e7eb; padding: .75rem; text-align: left; }
+.inline { display: inline; }
+.preview { min-height: 220px; padding: .8rem; background: #f9fafb; border: 1px dashed #cbd5e1; white-space: pre-wrap; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+.media-item img, .media-item video { width: 100%; max-height: 150px; object-fit: cover; border-radius: 8px; }
+.alert { padding: .6rem .8rem; border-radius: 6px; margin-bottom: .5rem; }
+.alert.success { background: #dcfce7; }
+.alert.info { background: #dbeafe; }
+.alert.warning { background: #fef3c7; }
+.alert.danger { background: #fee2e2; }
+.auth-card { margin-top: 8vh; }
+@media (max-width: 900px) {
+  body { flex-direction: column; }
+  .sidebar { width: 100%; min-height: auto; position: relative; }
+  .two-col { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ 'Edit Post' if post else 'Add Post' }}</h1>
+<div class="grid two-col">
+  <form method="post" class="card form-grid">
+    <label>Title
+      <input name="title" required value="{{ post.title if post else '' }}">
+    </label>
+    <label>Publish Date
+      <input type="datetime-local" name="published_at" value="{{ post.published_at.strftime('%Y-%m-%dT%H:%M') if post else '' }}">
+    </label>
+    <label>Categories
+      <select name="categories" multiple size="5">
+        {% for category in categories %}
+          <option value="{{ category.id }}" {% if post and category in post.categories %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Body
+      <textarea name="body" rows="10" required data-preview-target="#preview-post">{{ post.body if post else '' }}</textarea>
+    </label>
+    <button class="btn" type="submit">{{ 'Save Changes' if post else 'Create Post' }}</button>
+  </form>
+  <aside class="card">
+    <h3>Live Preview</h3>
+    <div id="preview-post" class="preview"></div>
+  </aside>
+</div>
+{% endblock %}
