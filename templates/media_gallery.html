@@ -1,0 +1,74 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero media-hero">
+  <div class="hero-overlay">
+    <h1>Media Gallery</h1>
+    <p>Highlights from past events across Burundi.</p>
+  </div>
+</section>
+
+<section class="card">
+  <form method="get" class="filters" id="media-filter-form">
+    <select name="type" id="gallery-type-filter">
+      <option value="">All media</option>
+      <option value="image" {% if request.args.get('type') == 'image' %}selected{% endif %}>Photos</option>
+      <option value="video" {% if request.args.get('type') == 'video' %}selected{% endif %}>Videos</option>
+    </select>
+
+    <select name="linked_type" id="gallery-linked-filter">
+      <option value="">All sources</option>
+      <option value="event" {% if request.args.get('linked_type') == 'event' %}selected{% endif %}>Events</option>
+      <option value="post" {% if request.args.get('linked_type') == 'post' %}selected{% endif %}>Blog Posts</option>
+    </select>
+
+    <select name="category" id="gallery-category-filter">
+      <option value="">All categories</option>
+      {% for category in category_options %}
+      <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="event" id="gallery-event-filter">
+      <option value="">All events</option>
+      {% for event in event_options %}
+      <option value="{{ event.id }}" {% if request.args.get('event') == event.id|string %}selected{% endif %}>{{ event.title }}</option>
+      {% endfor %}
+    </select>
+
+    <button class="btn" type="submit">Apply</button>
+  </form>
+</section>
+
+<section class="gallery-grid" id="public-gallery-grid">
+  {% for card in media_cards %}
+  <button
+    class="gallery-thumb public-gallery-item"
+    type="button"
+    data-lightbox-src="{{ url_for('static', filename='uploads/' + card.filename) }}"
+    data-lightbox-type="{{ card.media_type }}"
+    data-media-type="{{ card.media_type }}"
+    data-linked-type="{{ card.linked_type }}"
+    data-category="{{ card.linked_category }}"
+    data-event-id="{{ card.linked_id if card.linked_type == 'event' else '' }}"
+  >
+    {% if card.media_type == 'image' %}
+      <img src="{{ url_for('static', filename='uploads/' + card.filename) }}" alt="{{ card.linked_title }}">
+    {% else %}
+      <video muted><source src="{{ url_for('static', filename='uploads/' + card.filename) }}"></video>
+    {% endif %}
+    <span class="gallery-caption">{{ card.linked_title }} · {{ card.linked_category }}</span>
+  </button>
+  {% else %}
+  <p>No media found for the current filters.</p>
+  {% endfor %}
+</section>
+
+<div class="center-row">
+  <button id="gallery-load-more" class="btn" type="button">Load more</button>
+</div>
+
+<div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+  <button class="lightbox-close" type="button" id="lightbox-close">×</button>
+  <div id="lightbox-content"></div>
+</div>
+{% endblock %}

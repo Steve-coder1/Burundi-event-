@@ -16,6 +16,7 @@ Flask web application with:
 - Individual blog post pages with media, tags, and related post recommendations
 - About and Contact public pages with community context and local trust info
 - Contact form with server-side persistence and optional SMTP email delivery
+- Public media gallery with image/video grid, filters, lightbox, and load-more interactions
 
 ## Admin highlights
 - Admin login with hashed password storage (default: `admin` / `admin123`)
@@ -40,3 +41,4 @@ python app.py
 - Public blog: `http://localhost:5000/blog`
 - About page: `http://localhost:5000/about`
 - Contact page: `http://localhost:5000/contact`
+- Media gallery: `http://localhost:5000/gallery`

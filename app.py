@@ -202,6 +202,39 @@ def build_post_card(post: Post) -> dict:
 
 
 
+
+
+def build_media_card(item: Media) -> dict:
+    linked_title = "Unassigned"
+    linked_category = "General"
+    linked_language = "fr"
+
+    if item.linked_type == "event" and item.linked_id:
+        event = Event.query.get(item.linked_id)
+        if event:
+            linked_title = event.title
+            linked_category = event.categories[0].name if event.categories else "General"
+            linked_language = event.language
+    elif item.linked_type == "post" and item.linked_id:
+        post = Post.query.get(item.linked_id)
+        if post:
+            linked_title = post.title
+            linked_category = post.categories[0].name if post.categories else "General"
+            linked_language = post.language
+
+    return {
+        "id": item.id,
+        "filename": item.filename,
+        "media_type": item.media_type,
+        "linked_type": item.linked_type or "other",
+        "linked_id": item.linked_id,
+        "linked_title": linked_title,
+        "linked_category": linked_category,
+        "linked_language": linked_language,
+        "uploaded_at": item.uploaded_at.strftime("%Y-%m-%d"),
+    }
+
+
 def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple[bool, str]:
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
@@ -330,6 +363,43 @@ def set_language(lang: str):
     if lang in {"rn", "fr"}:
         session["public_lang"] = "rn" if lang == "rn" else "fr"
     return redirect(request.referrer or url_for("home"))
+
+
+@app.route("/gallery")
+def media_gallery():
+    increment_analytics("media_gallery", 0.8)
+    selected_type = request.args.get("type", "")
+    selected_linked_type = request.args.get("linked_type", "")
+    selected_category = request.args.get("category", "")
+    selected_event = request.args.get("event", type=int)
+    selected_language = session.get("public_lang", "fr")
+
+    media_items = Media.query.order_by(Media.uploaded_at.desc()).all()
+    cards = [build_media_card(item) for item in media_items]
+
+    filtered_cards = []
+    for card in cards:
+        if selected_type in {"image", "video"} and card["media_type"] != selected_type:
+            continue
+        if selected_linked_type in {"event", "post"} and card["linked_type"] != selected_linked_type:
+            continue
+        if selected_event and not (card["linked_type"] == "event" and card["linked_id"] == selected_event):
+            continue
+        if selected_category and card["linked_category"] != selected_category:
+            continue
+        if card["linked_language"] != selected_language:
+            continue
+        filtered_cards.append(card)
+
+    event_options = Event.query.filter(Event.language == selected_language).order_by(Event.event_date.desc()).limit(100).all()
+    category_options = sorted({card["linked_category"] for card in cards if card["linked_category"]})
+
+    return render_template(
+        "media_gallery.html",
+        media_cards=filtered_cards,
+        event_options=event_options,
+        category_options=category_options,
+    )
 
 
 @app.route("/about")

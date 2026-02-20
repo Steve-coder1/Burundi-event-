@@ -153,3 +153,67 @@ if (contactForm) {
     }
   });
 }
+
+
+const publicGalleryGrid = document.getElementById('public-gallery-grid');
+const galleryTypeFilter = document.getElementById('gallery-type-filter');
+const galleryLinkedFilter = document.getElementById('gallery-linked-filter');
+const galleryCategoryFilter = document.getElementById('gallery-category-filter');
+const galleryEventFilter = document.getElementById('gallery-event-filter');
+const galleryLoadMore = document.getElementById('gallery-load-more');
+
+let visibleGalleryCount = 12;
+
+function applyPublicGalleryFilters() {
+  if (!publicGalleryGrid) return;
+  const items = Array.from(publicGalleryGrid.querySelectorAll('.public-gallery-item'));
+  const typeValue = galleryTypeFilter?.value || '';
+  const linkedValue = galleryLinkedFilter?.value || '';
+  const categoryValue = galleryCategoryFilter?.value || '';
+  const eventValue = galleryEventFilter?.value || '';
+
+  let shown = 0;
+  items.forEach((item) => {
+    const matchesType = !typeValue || item.dataset.mediaType === typeValue;
+    const matchesLinked = !linkedValue || item.dataset.linkedType === linkedValue;
+    const matchesCategory = !categoryValue || item.dataset.category === categoryValue;
+    const matchesEvent = !eventValue || item.dataset.eventId === eventValue;
+
+    const matches = matchesType && matchesLinked && matchesCategory && matchesEvent;
+    if (matches && shown < visibleGalleryCount) {
+      item.style.display = 'block';
+      shown += 1;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  if (galleryLoadMore) {
+    const totalMatches = items.filter((item) => {
+      const matchesType = !typeValue || item.dataset.mediaType === typeValue;
+      const matchesLinked = !linkedValue || item.dataset.linkedType === linkedValue;
+      const matchesCategory = !categoryValue || item.dataset.category === categoryValue;
+      const matchesEvent = !eventValue || item.dataset.eventId === eventValue;
+      return matchesType && matchesLinked && matchesCategory && matchesEvent;
+    }).length;
+    galleryLoadMore.style.display = shown < totalMatches ? 'inline-block' : 'none';
+  }
+}
+
+[galleryTypeFilter, galleryLinkedFilter, galleryCategoryFilter, galleryEventFilter].forEach((node) => {
+  if (node) {
+    node.addEventListener('change', () => {
+      visibleGalleryCount = 12;
+      applyPublicGalleryFilters();
+    });
+  }
+});
+
+if (galleryLoadMore) {
+  galleryLoadMore.addEventListener('click', () => {
+    visibleGalleryCount += 12;
+    applyPublicGalleryFilters();
+  });
+}
+
+applyPublicGalleryFilters();
