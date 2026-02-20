@@ -1,4 +1,4 @@
-{% extends 'base_public.html' %}
+{% extends 'base.html' %}
 {% block content %}
 <div class="card auth-card">
   <h1>Admin Login</h1>
@@ -13,8 +13,5 @@
     <button class="btn" type="submit">Sign in</button>
   </form>
   <small>Default credentials: admin / admin123</small>
-  <p>
-    <a class="btn btn-secondary" href="{{ url_for('public_entry') }}">Go to Public Home</a>
-  </p>
 </div>
 {% endblock %}

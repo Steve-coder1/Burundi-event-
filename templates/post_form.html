@@ -1,4 +1,4 @@
-{% extends 'base_admin.html' %}
+{% extends 'base.html' %}
 {% block content %}
 <h1>{{ 'Edit Post' if post else 'Add Post' }}</h1>
 <div class="grid two-col">
@@ -8,25 +8,6 @@
     </label>
     <label>Publish Date
       <input type="datetime-local" name="published_at" value="{{ post.published_at.strftime('%Y-%m-%dT%H:%M') if post else '' }}">
-    </label>
-    <label>Language
-      <select name="language">
-        <option value="en" {% if post and post.language == 'en' %}selected{% endif %}>English</option>
-        <option value="fr" {% if post and post.language == 'fr' %}selected{% endif %}>French</option>
-        <option value="rn" {% if post and post.language == 'rn' %}selected{% endif %}>Kirundi</option>
-      </select>
-    </label>
-    <label>Tags (comma separated)
-      <input name="tags" value="{{ post.tags if post else '' }}" placeholder="announcement, community">
-    </label>
-    <label>SEO Title
-      <input name="seo_title" value="{{ post.seo_title if post else '' }}" placeholder="Custom title for search engines">
-    </label>
-    <label>SEO Description
-      <input name="seo_description" value="{{ post.seo_description if post else '' }}" placeholder="Short description for search results">
-    </label>
-    <label>SEO Keywords
-      <input name="seo_keywords" value="{{ post.seo_keywords if post else '' }}" placeholder="blog, news, burundi">
     </label>
     <label>Categories
       <select name="categories" multiple size="5">

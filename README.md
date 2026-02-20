@@ -33,6 +33,21 @@ Flask web application with:
 - Dynamic categories management
 - Media library with drag-and-drop upload support
 - Analytics overview with Chart.js
+# Burundi Event Admin Dashboard
+
+Flask-based admin panel for managing events, blog posts, categories, media assets, and analytics.
+
+## Features
+- Admin login with hashed password storage (default: `admin` / `admin123`)
+- Dashboard overview with quick actions and summary cards
+- Event CRUD with category assignment, language, and filtering
+- Blog post CRUD with category/tag style assignment and filtering
+- Dynamic category management for events and posts
+- Media library with upload, filtering, and delete actions
+- Analytics page with charts for views and popularity
+- Live content preview in event/post editors
+- Drag-and-drop file upload support
+- Responsive layout for desktop/tablet use
 
 ## Run locally
 ```bash
@@ -42,23 +57,4 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Routes
-- Public landing page: `http://localhost:5000/kirundi/` (or `http://localhost:5000/fr/`)
-- Public alias routes: `http://localhost:5000/public`, `http://localhost:5000/public/`, `http://localhost:5000/public/fr`
-- Extra frontend shortcuts: `http://localhost:5000/frontend` and `http://localhost:5000/site`
-- Alternative local host: `http://127.0.0.1:5000/kirundi/`
-- Network/LAN format: `http://<your-local-ip>:5000/kirundi/`
-- Public events home: `http://localhost:5000/kirundi/home` (or `http://localhost:5000/fr/home`)
-- Admin login: `http://localhost:5000/admin/login`
-
-- Public blog: `http://localhost:5000/kirundi/blog`
-- About page: `http://localhost:5000/kirundi/about`
-- Contact page: `http://localhost:5000/kirundi/contact`
-- Media gallery: `http://localhost:5000/kirundi/gallery`
-- Sponsors page: `http://localhost:5000/kirundi/sponsors`
-- Local guides page: `http://localhost:5000/kirundi/guides`
-- FAQs page: `http://localhost:5000/kirundi/faqs`
-- Search page: `http://localhost:5000/kirundi/search`
-- Analytics dashboard: `http://localhost:5000/admin/analytics`
-- Sitemap: `http://localhost:5000/sitemap.xml`
-- Robots: `http://localhost:5000/robots.txt`
+Then open `http://localhost:5000`.

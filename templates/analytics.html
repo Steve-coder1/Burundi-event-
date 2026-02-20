@@ -1,42 +1,6 @@
-{% extends 'base_admin.html' %}
+{% extends 'base.html' %}
 {% block content %}
-<div class="title-row">
-  <h1>Analytics Overview</h1>
-  <a class="btn" href="{{ url_for('analytics_export') }}">Download CSV</a>
-</div>
-
-<section class="card">
-  <form method="get" class="filters">
-    <label>From <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}"></label>
-    <label>To <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}"></label>
-    <label>Content Type
-      <select name="content_type">
-        <option value="">All</option>
-        <option value="event" {% if request.args.get('content_type') == 'event' %}selected{% endif %}>Event</option>
-        <option value="post" {% if request.args.get('content_type') == 'post' %}selected{% endif %}>Post</option>
-        <option value="media" {% if request.args.get('content_type') == 'media' %}selected{% endif %}>Media</option>
-        <option value="page" {% if request.args.get('content_type') == 'page' %}selected{% endif %}>Page</option>
-      </select>
-    </label>
-    <label>Category
-      <select name="category">
-        <option value="">All</option>
-        {% for item in categories %}
-        <option value="{{ item }}" {% if request.args.get('category') == item %}selected{% endif %}>{{ item }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button class="btn" type="submit">Apply</button>
-  </form>
-</section>
-
-<div class="grid stats-grid">
-  <article class="card"><h3>Total Views</h3><p>{{ total_page_views }}</p></article>
-  <article class="card"><h3>Unique Visitors</h3><p>{{ unique_visitors }}</p></article>
-  <article class="card"><h3>Top Event</h3><p>{{ top_events[0].content_title if top_events else 'N/A' }}</p></article>
-  <article class="card"><h3>Top Post</h3><p>{{ top_posts[0].content_title if top_posts else 'N/A' }}</p></article>
-</div>
-
+<h1>Analytics Overview</h1>
 <div class="grid two-col">
   <section class="card">
     <h3>Page Views</h3>
@@ -47,50 +11,7 @@
     <canvas id="popularityChart"></canvas>
   </section>
 </div>
-
-<div class="grid two-col">
-  <section class="card">
-    <h3>Traffic Trend (Daily)</h3>
-    <canvas id="trafficChart"></canvas>
-  </section>
-  <section class="card">
-    <h3>Top Referral Sources</h3>
-    <canvas id="referralChart"></canvas>
-  </section>
-</div>
-
-<div class="grid two-col">
-  <section class="card">
-    <h3>Event Performance</h3>
-    <table>
-      <thead><tr><th>Event</th><th>Category</th><th>Views</th></tr></thead>
-      <tbody>
-      {% for row in event_performance %}
-      <tr><td>{{ row.content_title }}</td><td>{{ row.category or '-' }}</td><td>{{ row.views }}</td></tr>
-      {% else %}
-      <tr><td colspan="3">No event data.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </section>
-
-  <section class="card">
-    <h3>Post Performance</h3>
-    <table>
-      <thead><tr><th>Post</th><th>Category</th><th>Views</th></tr></thead>
-      <tbody>
-      {% for row in post_performance %}
-      <tr><td>{{ row.content_title }}</td><td>{{ row.category or '-' }}</td><td>{{ row.views }}</td></tr>
-      {% else %}
-      <tr><td colspan="3">No post data.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </section>
-</div>
-
 <section class="card">
-  <h3>Legacy Analytics Counters</h3>
   <table>
     <thead><tr><th>Page</th><th>Views</th><th>Popularity Score</th><th>Updated</th></tr></thead>
     <tbody>
@@ -112,10 +33,6 @@
   const labels = {{ labels | tojson }};
   const viewValues = {{ view_values | tojson }};
   const popularityValues = {{ popularity_values | tojson }};
-  const trafficLabels = {{ traffic_labels | tojson }};
-  const trafficValues = {{ traffic_values | tojson }};
-  const refLabels = {{ referrers | map(attribute='referrer_domain') | list | tojson }};
-  const refValues = {{ referrers | map(attribute='count') | list | tojson }};
 
   new Chart(document.getElementById('viewsChart'), {
     type: 'bar',
@@ -125,16 +42,6 @@
   new Chart(document.getElementById('popularityChart'), {
     type: 'line',
     data: { labels, datasets: [{ label: 'Popularity', data: popularityValues, borderColor: '#10b981', tension: 0.25 }] }
-  });
-
-  new Chart(document.getElementById('trafficChart'), {
-    type: 'line',
-    data: { labels: trafficLabels, datasets: [{ label: 'Daily Views', data: trafficValues, borderColor: '#6366f1', tension: 0.2 }] }
-  });
-
-  new Chart(document.getElementById('referralChart'), {
-    type: 'doughnut',
-    data: { labels: refLabels, datasets: [{ label: 'Referrals', data: refValues, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#f97316'] }] }
   });
 </script>
 {% endblock %}
