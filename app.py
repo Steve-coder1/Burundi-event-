@@ -1,21 +1,13 @@
 from __future__ import annotations
 
 import os
-import csv
-import re
-import smtplib
-from io import StringIO
 from datetime import datetime
-from email.message import EmailMessage
 from functools import wraps
 from uuid import uuid4
-from urllib.parse import urlparse
 
 from flask import (
     Flask,
     flash,
-    jsonify,
-    Response,
     redirect,
     render_template,
     request,
@@ -23,7 +15,6 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -37,15 +28,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///admin_dashboard.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-PRIMARY_PUBLIC_LANG = "rn"
-LANGUAGE_ALIASES = {
-    "rn": "rn",
-    "kirundi": "rn",
-    "fr": "fr",
-    "french": "fr",
-}
-LANGUAGE_SEGMENTS = {"rn": "kirundi", "fr": "fr"}
-
 db = SQLAlchemy(app)
 
 
@@ -53,27 +35,12 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def normalize_public_lang(raw_lang: str | None) -> str:
-    if not raw_lang:
-        return PRIMARY_PUBLIC_LANG
-    return LANGUAGE_ALIASES.get(raw_lang.lower(), PRIMARY_PUBLIC_LANG)
-
-
-def get_public_lang(route_lang: str | None = None) -> str:
-    language = normalize_public_lang(route_lang or session.get("public_lang"))
-    session["public_lang"] = language
-    return language
-
-
-def get_lang_segment(language: str) -> str:
-    return LANGUAGE_SEGMENTS.get(language, LANGUAGE_SEGMENTS[PRIMARY_PUBLIC_LANG])
-
-
-def apply_language_fallback(query, model, language: str):
-    localized = query.filter(model.language == language)
-    if language != PRIMARY_PUBLIC_LANG and localized.count() == 0:
-        return query.filter(model.language == PRIMARY_PUBLIC_LANG), True
-    return localized, False
+content_categories = db.Table(
+    "content_categories",
+    db.Column("category_id", db.Integer, db.ForeignKey("category.id"), primary_key=True),
+    db.Column("event_id", db.Integer, db.ForeignKey("event.id"), nullable=True),
+    db.Column("post_id", db.Integer, db.ForeignKey("post.id"), nullable=True),
+)
 
 
 class AdminUser(db.Model):
@@ -101,12 +68,7 @@ class Event(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     event_date = db.Column(db.DateTime, nullable=False)
-    location = db.Column(db.String(200), default="TBD")
-    tags = db.Column(db.String(255), default="")
     language = db.Column(db.String(10), default="en")
-    seo_title = db.Column(db.String(255), default="")
-    seo_description = db.Column(db.String(255), default="")
-    seo_keywords = db.Column(db.String(255), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -114,11 +76,6 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     body = db.Column(db.Text, nullable=False)
-    language = db.Column(db.String(10), default="fr")
-    tags = db.Column(db.String(255), default="")
-    seo_title = db.Column(db.String(255), default="")
-    seo_description = db.Column(db.String(255), default="")
-    seo_keywords = db.Column(db.String(255), default="")
     published_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -150,56 +107,6 @@ class Analytics(db.Model):
     views = db.Column(db.Integer, default=0)
     popularity_score = db.Column(db.Float, default=0.0)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-class ContactMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(160), nullable=False)
-    phone = db.Column(db.String(50), nullable=True)
-    message = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class Sponsor(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(140), nullable=False)
-    website_url = db.Column(db.String(255), nullable=False)
-    logo_url = db.Column(db.String(255), nullable=True)
-    description = db.Column(db.String(255), default="")
-    sponsor_type = db.Column(db.String(50), default="community")
-    language = db.Column(db.String(10), default="fr")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class LocalGuide(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(160), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    guide_type = db.Column(db.String(50), default="community")
-    image_url = db.Column(db.String(255), nullable=True)
-    language = db.Column(db.String(10), default="fr")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class FAQ(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    question = db.Column(db.String(255), nullable=False)
-    answer = db.Column(db.Text, nullable=False)
-    language = db.Column(db.String(10), default="fr")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class TrackingEvent(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    visitor_id = db.Column(db.String(64), nullable=False)
-    content_type = db.Column(db.String(20), nullable=False)  # page|event|post|media
-    content_id = db.Column(db.String(64), nullable=False)
-    content_title = db.Column(db.String(255), nullable=True)
-    category = db.Column(db.String(120), nullable=True)
-    interaction = db.Column(db.String(20), default="view")
-    referrer_domain = db.Column(db.String(120), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # Relation helpers
@@ -345,278 +252,12 @@ def increment_analytics(page: str, score: float = 0.5) -> None:
         db.session.add(record)
     record.views += 1
     record.popularity_score += score
-    log_tracking_event(content_type="page", content_id=page, title=page)
     db.session.commit()
-
-
-def get_event_image(event_id: int) -> str | None:
-    media = (
-        Media.query.filter_by(linked_type="event", linked_id=event_id, media_type="image")
-        .order_by(Media.uploaded_at.desc())
-        .first()
-    )
-    return media.filename if media else None
-
-
-def build_event_card(event: Event) -> dict:
-    return {
-        "id": event.id,
-        "title": event.title,
-        "date": event.event_date.strftime("%Y-%m-%d"),
-        "time": event.event_date.strftime("%H:%M"),
-        "category": event.categories[0].name if event.categories else "General",
-        "category_id": event.categories[0].id if event.categories else 0,
-        "image": get_event_image(event.id),
-        "description": event.description,
-        "location": event.location or "TBD",
-        "tags": [tag.strip() for tag in (event.tags or "").split(",") if tag.strip()],
-        "slug": event_slug(event),
-    }
-
-
-def get_post_image(post_id: int) -> str | None:
-    media = (
-        Media.query.filter_by(linked_type="post", linked_id=post_id, media_type="image")
-        .order_by(Media.uploaded_at.desc())
-        .first()
-    )
-    return media.filename if media else None
-
-
-def build_post_card(post: Post) -> dict:
-    return {
-        "id": post.id,
-        "title": post.title,
-        "excerpt": f"{post.body[:160]}..." if len(post.body) > 160 else post.body,
-        "published": post.published_at.strftime("%Y-%m-%d"),
-        "category": post.categories[0].name if post.categories else "General",
-        "category_id": post.categories[0].id if post.categories else 0,
-        "image": get_post_image(post.id),
-        "tags": [tag.strip() for tag in (post.tags or "").split(",") if tag.strip()],
-        "slug": post_slug(post),
-    }
-
-
-
-
-
-def build_media_card(item: Media) -> dict:
-    linked_title = "Unassigned"
-    linked_category = "General"
-    linked_language = "fr"
-
-    if item.linked_type == "event" and item.linked_id:
-        event = Event.query.get(item.linked_id)
-        if event:
-            linked_title = event.title
-            linked_category = event.categories[0].name if event.categories else "General"
-            linked_language = event.language
-    elif item.linked_type == "post" and item.linked_id:
-        post = Post.query.get(item.linked_id)
-        if post:
-            linked_title = post.title
-            linked_category = post.categories[0].name if post.categories else "General"
-            linked_language = post.language
-
-    return {
-        "id": item.id,
-        "filename": item.filename,
-        "media_type": item.media_type,
-        "linked_type": item.linked_type or "other",
-        "linked_id": item.linked_id,
-        "linked_title": linked_title,
-        "linked_category": linked_category,
-        "linked_language": linked_language,
-        "uploaded_at": item.uploaded_at.strftime("%Y-%m-%d"),
-    }
-
-
-
-def serialize_search_results(language: str) -> list[dict]:
-    rows: list[dict] = []
-
-    events = Event.query.filter(Event.language == language).all()
-    for event in events:
-        card = build_event_card(event)
-        rows.append(
-            {
-                "content_type": "event",
-                "id": event.id,
-                "title": card["title"],
-                "description": event.description,
-                "date": event.event_date.strftime("%Y-%m-%d"),
-                "category": card["category"],
-                "tags": card["tags"],
-                "media_type": "",
-                "url": event_public_url(event, language),
-                "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
-            }
-        )
-
-    posts = Post.query.filter(Post.language == language).all()
-    for post in posts:
-        card = build_post_card(post)
-        rows.append(
-            {
-                "content_type": "post",
-                "id": post.id,
-                "title": card["title"],
-                "description": card["excerpt"],
-                "date": card["published"],
-                "category": card["category"],
-                "tags": card["tags"],
-                "media_type": "",
-                "url": post_public_url(post, language),
-                "thumbnail": url_for("static", filename=f"uploads/{card['image']}") if card["image"] else "",
-            }
-        )
-
-    media_items = [build_media_card(item) for item in Media.query.order_by(Media.uploaded_at.desc()).all()]
-    for media in media_items:
-        if media["linked_language"] != language:
-            continue
-        rows.append(
-            {
-                "content_type": "media",
-                "id": media["id"],
-                "title": media["linked_title"],
-                "description": f"{media['linked_type'].title()} media highlight",
-                "date": media["uploaded_at"],
-                "category": media["linked_category"],
-                "tags": [],
-                "media_type": media["media_type"],
-                "url": url_for("media_gallery", lang=get_lang_segment(language)),
-                "thumbnail": url_for("static", filename=f"uploads/{media['filename']}"),
-            }
-        )
-
-    return rows
-
-
-def filter_search_results(rows: list[dict], params: dict) -> list[dict]:
-    keyword = params.get("q", "").strip().lower()
-    content_type = params.get("content_type", "")
-    event_category = params.get("event_category", "")
-    post_category = params.get("post_category", "")
-    post_tag = params.get("post_tag", "").strip().lower()
-    media_type = params.get("media_type", "")
-    date_from = params.get("date_from", "")
-    date_to = params.get("date_to", "")
-
-    filtered: list[dict] = []
-    for row in rows:
-        if content_type and row["content_type"] != content_type:
-            continue
-        if keyword and keyword not in f"{row['title']} {row['description']}".lower():
-            continue
-
-        if row["content_type"] == "event" and event_category and row["category"] != event_category:
-            continue
-        if row["content_type"] == "post" and post_category and row["category"] != post_category:
-            continue
-        if row["content_type"] == "post" and post_tag and post_tag not in ",".join(row["tags"]).lower():
-            continue
-        if row["content_type"] == "media" and media_type and row["media_type"] != media_type:
-            continue
-
-        if date_from and row["date"] < date_from:
-            continue
-        if date_to and row["date"] > date_to:
-            continue
-
-        filtered.append(row)
-
-    sort_by = params.get("sort", "date_desc")
-    if sort_by == "date_asc":
-        filtered.sort(key=lambda x: x["date"])
-    elif sort_by == "category_asc":
-        filtered.sort(key=lambda x: (x["category"], x["date"]), reverse=False)
-    else:
-        filtered.sort(key=lambda x: x["date"], reverse=True)
-
-    return filtered
-
-
-def send_contact_email(name: str, email: str, phone: str, message: str) -> tuple[bool, str]:
-    smtp_host = os.environ.get("SMTP_HOST")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_username = os.environ.get("SMTP_USERNAME")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    admin_email = os.environ.get("ADMIN_CONTACT_EMAIL")
-
-    if not smtp_host or not admin_email:
-        return False, "SMTP is not configured. Message saved for admin review."
-
-    mail = EmailMessage()
-    mail["Subject"] = f"New Contact Message from {name}"
-    mail["From"] = smtp_username or admin_email
-    mail["To"] = admin_email
-    mail.set_content(
-        f"Name: {name}\nEmail: {email}\nPhone: {phone or 'N/A'}\n\nMessage:\n{message}"
-    )
-
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-            server.starttls()
-            if smtp_username and smtp_password:
-                server.login(smtp_username, smtp_password)
-            server.send_message(mail)
-        return True, "Message sent successfully."
-    except Exception:
-        return False, "Message saved, but email delivery failed."
-
-
-@app.context_processor
-def inject_globals():
-    active_lang = get_public_lang()
-    default_seo = build_seo_meta(
-        title="Burundi Events",
-        description="Discover local events, stories, and community highlights across Burundi.",
-        language=active_lang,
-        keywords="Burundi events, local events, Bujumbura, community",
-    )
-    return {
-        "current_public_lang": active_lang,
-        "current_public_lang_segment": get_lang_segment(active_lang),
-        "is_primary_lang": active_lang == PRIMARY_PUBLIC_LANG,
-        "seo": default_seo,
-        "structured_data": None,
-        "breadcrumbs": build_breadcrumbs(),
-        "nav_endpoint": request.endpoint or "",
-    }
 
 
 @app.before_request
 def ensure_seed_data():
-    if not session.get("visitor_id"):
-        session["visitor_id"] = uuid4().hex
     db.create_all()
-    with db.engine.connect() as conn:
-        event_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(event)"))}
-        if "location" not in event_columns:
-            conn.execute(text("ALTER TABLE event ADD COLUMN location VARCHAR(200) DEFAULT 'TBD'"))
-        if "tags" not in event_columns:
-            conn.execute(text("ALTER TABLE event ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
-        if "seo_title" not in event_columns:
-            conn.execute(text("ALTER TABLE event ADD COLUMN seo_title VARCHAR(255) DEFAULT ''"))
-        if "seo_description" not in event_columns:
-            conn.execute(text("ALTER TABLE event ADD COLUMN seo_description VARCHAR(255) DEFAULT ''"))
-        if "seo_keywords" not in event_columns:
-            conn.execute(text("ALTER TABLE event ADD COLUMN seo_keywords VARCHAR(255) DEFAULT ''"))
-
-        post_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(post)"))}
-        if "language" not in post_columns:
-            conn.execute(text("ALTER TABLE post ADD COLUMN language VARCHAR(10) DEFAULT 'fr'"))
-        if "tags" not in post_columns:
-            conn.execute(text("ALTER TABLE post ADD COLUMN tags VARCHAR(255) DEFAULT ''"))
-        if "seo_title" not in post_columns:
-            conn.execute(text("ALTER TABLE post ADD COLUMN seo_title VARCHAR(255) DEFAULT ''"))
-        if "seo_description" not in post_columns:
-            conn.execute(text("ALTER TABLE post ADD COLUMN seo_description VARCHAR(255) DEFAULT ''"))
-        if "seo_keywords" not in post_columns:
-            conn.execute(text("ALTER TABLE post ADD COLUMN seo_keywords VARCHAR(255) DEFAULT ''"))
-        conn.commit()
-
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     admin = AdminUser.query.filter_by(username="admin").first()
     if not admin:
@@ -625,580 +266,15 @@ def ensure_seed_data():
         db.session.add(admin)
         db.session.commit()
 
-    if Sponsor.query.count() == 0:
-        db.session.add_all(
-            [
-                Sponsor(
-                    name="Burundi Creative Hub",
-                    website_url="https://example.org/creative-hub",
-                    logo_url="",
-                    description="Supports youth-led music and arts programs.",
-                    sponsor_type="arts",
-                    language="fr",
-                ),
-                Sponsor(
-                    name="Lake Tanganyika Sports",
-                    website_url="https://example.org/lake-sports",
-                    logo_url="",
-                    description="Partner for community sports festivals.",
-                    sponsor_type="sports",
-                    language="fr",
-                ),
-            ]
-        )
-
-    if LocalGuide.query.count() == 0:
-        db.session.add_all(
-            [
-                LocalGuide(
-                    title="Best Evening Venues in Bujumbura",
-                    content="Look for venues near the waterfront and arrive early during festival nights.",
-                    guide_type="music",
-                    language="fr",
-                ),
-                LocalGuide(
-                    title="Community Event Etiquette",
-                    content="Respect local customs, support local vendors, and keep public spaces clean.",
-                    guide_type="community",
-                    language="fr",
-                ),
-                LocalGuide(
-                    title="Getting Around for Sports Events",
-                    content="Use trusted taxi points and plan return transport before late matches.",
-                    guide_type="sports",
-                    language="fr",
-                ),
-            ]
-        )
-
-    for event in Event.query.filter((Event.seo_title == "") | (Event.seo_title.is_(None))).all():
-        event.seo_title = event.title
-        event.seo_description = (event.description or "")[:160]
-        event.seo_keywords = event.tags or "burundi,event"
-
-    for post in Post.query.filter((Post.seo_title == "") | (Post.seo_title.is_(None))).all():
-        post.seo_title = post.title
-        post.seo_description = (post.body or "")[:160]
-        post.seo_keywords = post.tags or "burundi,blog,news"
-
-    if FAQ.query.count() == 0:
-        db.session.add_all(
-            [
-                FAQ(
-                    question="How are events selected?",
-                    answer="Events are reviewed from local organizers and verified before publication.",
-                    language="fr",
-                ),
-                FAQ(
-                    question="Can I submit my event?",
-                    answer="Yes. Use the contact form with event details and your team will review it.",
-                    language="fr",
-                ),
-                FAQ(
-                    question="Are events free to attend?",
-                    answer="Some are free and others are ticketed. Check each event detail page for guidance.",
-                    language="fr",
-                ),
-            ]
-        )
-
-    db.session.commit()
-
-
-@app.route("/public")
-@app.route("/public/<lang>")
-def public_entry(lang: str | None = None):
-    selected_lang = normalize_public_lang(lang)
-    return redirect(url_for("index", lang=get_lang_segment(selected_lang)))
-
 
 @app.route("/")
-@app.route("/<lang>/")
-def index(lang: str | None = None):
-    current_lang = get_public_lang(lang)
-    event_query, event_fallback = apply_language_fallback(Event.query, Event, current_lang)
-    upcoming_events = event_query.order_by(Event.event_date.asc()).limit(6).all()
-    post_query, post_fallback = apply_language_fallback(Post.query, Post, current_lang)
-    recent_posts = [build_post_card(post) for post in post_query.order_by(Post.published_at.desc()).limit(3).all()]
-    featured_cards = [build_event_card(event) for event in upcoming_events]
-    return render_template(
-        "landing.html",
-        featured_events=featured_cards,
-        recent_posts=recent_posts,
-        translation_fallback=event_fallback or post_fallback,
-        seo=build_seo_meta(
-            title="Burundi Events | Home",
-            description="Discover upcoming local events and stories in Burundi.",
-            language=current_lang,
-            keywords="Burundi events, local events, culture, community",
-        ),
-    )
+def index():
+    if session.get("admin_user"):
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
 
 
-@app.route("/home")
-@app.route("/<lang>/home")
-def home(lang: str | None = None):
-    increment_analytics("home", 1.0)
-    keyword = request.args.get("keyword", "").strip().lower()
-    category_id = request.args.get("category", type=int)
-    sort_order = request.args.get("sort", "asc")
-    page = request.args.get("page", 1, type=int)
-    per_page = 9
-    current_lang = get_public_lang(lang)
-
-    query, events_fallback = apply_language_fallback(Event.query, Event, current_lang)
-    if keyword:
-        query = query.filter(Event.title.ilike(f"%{keyword}%"))
-    if category_id:
-        query = query.join(EventCategory, Event.id == EventCategory.event_id).filter(EventCategory.category_id == category_id)
-
-    query = query.order_by(Event.event_date.asc() if sort_order == "asc" else Event.event_date.desc())
-    events = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    cards = [build_event_card(event) for event in events.items]
-
-    featured_event = cards[0] if cards else None
-    post_query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
-    blog_highlights = [build_post_card(post) for post in post_query.order_by(Post.published_at.desc()).limit(3).all()]
-    event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
-    return render_template(
-        "home.html",
-        featured_event=featured_event,
-        event_cards=cards,
-        pagination=events,
-        categories=event_categories,
-        blog_highlights=blog_highlights,
-        translation_fallback=events_fallback or posts_fallback,
-        seo=build_seo_meta(
-            title="Upcoming Events in Burundi",
-            description="Browse upcoming events in Burundi with filters and categories.",
-            language=current_lang,
-            keywords="events Burundi, concerts Burundi, community events",
-        ),
-    )
-
-
-@app.route("/events")
-@app.route("/<lang>/events")
-def public_events(lang: str | None = None):
-    active_lang = get_public_lang(lang)
-    return redirect(url_for("home", lang=get_lang_segment(active_lang)))
-
-
-@app.route("/events/<int:event_id>")
-@app.route("/<lang>/events/<int:event_id>")
-@app.route("/events/<slug>-<int:event_id>")
-@app.route("/<lang>/events/<slug>-<int:event_id>")
-def event_detail(event_id: int, lang: str | None = None, slug: str | None = None):
-    current_lang = get_public_lang(lang)
-    event = Event.query.get_or_404(event_id)
-    canonical_slug = event_slug(event)
-    if slug != canonical_slug:
-        return redirect(event_public_url(event, current_lang), code=301)
-    log_tracking_event(
-        content_type="event",
-        content_id=str(event.id),
-        title=event.title,
-        category=event.categories[0].name if event.categories else "General",
-    )
-    gallery = Media.query.filter_by(linked_type="event", linked_id=event.id).order_by(Media.uploaded_at.desc()).all()
-
-    related_query = Event.query.filter(Event.id != event.id, Event.language == event.language)
-    if event.categories:
-        cat_ids = [category.id for category in event.categories]
-        related_query = related_query.join(EventCategory, Event.id == EventCategory.event_id).filter(
-            EventCategory.category_id.in_(cat_ids)
-        )
-    related_events = related_query.order_by(Event.event_date.asc()).limit(6).all()
-    related_cards = [build_event_card(item) for item in related_events]
-
-    event_image = get_event_image(event.id)
-    image_url = url_for("static", filename=f"uploads/{event_image}", _external=True) if event_image else ""
-    event_url = event_public_url(event, current_lang, external=True)
-    structured_data = {
-        "@context": "https://schema.org",
-        "@type": "Event",
-        "name": event.title,
-        "startDate": event.event_date.isoformat(),
-        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
-        "eventStatus": "https://schema.org/EventScheduled",
-        "location": {"@type": "Place", "name": event.location or "Burundi"},
-        "description": event.description,
-        "url": event_url,
-    }
-    return render_template(
-        "event_detail.html",
-        event=event,
-        gallery=gallery,
-        related_events=related_cards,
-        translation_fallback=(event.language != current_lang and event.language == PRIMARY_PUBLIC_LANG),
-        seo=build_seo_meta(
-            title=event.seo_title or event.title,
-            description=event.seo_description or event.description,
-            language=event.language,
-            keywords=event.seo_keywords or event.tags,
-            image_url=image_url,
-            url=event_url,
-            content_type="event",
-        ),
-        structured_data=structured_data,
-    )
-
-
-@app.route("/set-language/<lang>")
-def set_language(lang: str):
-    session["public_lang"] = normalize_public_lang(lang)
-    return redirect(request.referrer or url_for("home", lang=get_lang_segment(session["public_lang"])))
-
-
-@app.route("/search")
-@app.route("/<lang>/search")
-def search_page(lang: str | None = None):
-    increment_analytics("search", 0.7)
-    current_lang = get_public_lang(lang)
-    event_categories = Category.query.filter_by(content_type="event").order_by(Category.name.asc()).all()
-    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
-    post_query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
-    post_tags = sorted({tag.strip() for p in post_query.all() for tag in (p.tags or "").split(",") if tag.strip()})
-    return render_template(
-        "search.html",
-        event_categories=event_categories,
-        post_categories=post_categories,
-        post_tags=post_tags,
-        translation_fallback=posts_fallback,
-        seo=build_seo_meta(
-            title="Search Burundi Events, Posts and Media",
-            description="Find events, news posts, and media highlights across Burundi.",
-            language=current_lang,
-            keywords="search events Burundi, blog Burundi, media gallery",
-        ),
-    )
-
-
-
-
-@app.route("/sitemap.xml")
-def sitemap_xml():
-    pages = []
-    now = datetime.utcnow().date().isoformat()
-    for language in ("rn", "fr"):
-        segment = get_lang_segment(language)
-        pages.extend(
-            [
-                url_for("index", lang=segment, _external=True),
-                url_for("home", lang=segment, _external=True),
-                url_for("blog_home", lang=segment, _external=True),
-                url_for("media_gallery", lang=segment, _external=True),
-                url_for("search_page", lang=segment, _external=True),
-                url_for("about_page", lang=segment, _external=True),
-                url_for("contact_page", lang=segment, _external=True),
-            ]
-        )
-        pages.extend(event_public_url(event, language, external=True) for event in Event.query.filter_by(language=language).all())
-        pages.extend(post_public_url(post, language, external=True) for post in Post.query.filter_by(language=language).all())
-
-    unique_pages = sorted(set(pages))
-    xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for page in unique_pages:
-        xml.append(f"<url><loc>{page}</loc><lastmod>{now}</lastmod></url>")
-    xml.append("</urlset>")
-    return Response("".join(xml), mimetype="application/xml")
-
-
-@app.route("/robots.txt")
-def robots_txt():
-    body = "User-agent: *\nAllow: /\nSitemap: " + url_for("sitemap_xml", _external=True)
-    return Response(body, mimetype="text/plain")
-
-@app.route("/api/search")
-def api_search():
-    current_lang = get_public_lang()
-    rows = serialize_search_results(current_lang)
-    filtered = filter_search_results(rows, request.args)
-
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 12, type=int)
-    start = (page - 1) * per_page
-    end = start + per_page
-    payload = {
-        "results": filtered[start:end],
-        "total": len(filtered),
-        "page": page,
-        "per_page": per_page,
-        "has_next": end < len(filtered),
-    }
-    return jsonify(payload)
-
-
-@app.route("/api/autocomplete")
-def api_autocomplete():
-    current_lang = get_public_lang()
-    q = request.args.get("q", "").strip().lower()
-    if not q:
-        return jsonify({"suggestions": []})
-
-    titles = [row["title"] for row in serialize_search_results(current_lang)]
-    seen = []
-    for title in titles:
-        if q in title.lower() and title not in seen:
-            seen.append(title)
-        if len(seen) >= 8:
-            break
-    return jsonify({"suggestions": seen})
-
-
-@app.route("/api/track", methods=["POST"])
-def api_track():
-    payload = request.get_json(silent=True) or {}
-    content_type = payload.get("content_type", "page")
-    content_id = str(payload.get("content_id", "unknown"))
-    title = payload.get("title", "")
-    category = payload.get("category", "")
-    interaction = payload.get("interaction", "click")
-
-    log_tracking_event(
-        content_type=content_type,
-        content_id=content_id,
-        title=title,
-        category=category,
-        interaction=interaction,
-    )
-    db.session.commit()
-    return jsonify({"ok": True})
-
-
-@app.route("/gallery")
-@app.route("/<lang>/gallery")
-def media_gallery(lang: str | None = None):
-    increment_analytics("media_gallery", 0.8)
-    log_tracking_event(content_type="media", content_id="gallery", title="Public Media Gallery")
-    selected_type = request.args.get("type", "")
-    selected_linked_type = request.args.get("linked_type", "")
-    selected_category = request.args.get("category", "")
-    selected_event = request.args.get("event", type=int)
-    selected_language = get_public_lang(lang)
-    translation_fallback = False
-
-    media_items = Media.query.order_by(Media.uploaded_at.desc()).all()
-    cards = [build_media_card(item) for item in media_items]
-
-    filtered_cards = []
-    for card in cards:
-        if selected_type in {"image", "video"} and card["media_type"] != selected_type:
-            continue
-        if selected_linked_type in {"event", "post"} and card["linked_type"] != selected_linked_type:
-            continue
-        if selected_event and not (card["linked_type"] == "event" and card["linked_id"] == selected_event):
-            continue
-        if selected_category and card["linked_category"] != selected_category:
-            continue
-        if card["linked_language"] != selected_language:
-            continue
-        filtered_cards.append(card)
-
-    if not filtered_cards and selected_language != PRIMARY_PUBLIC_LANG:
-        translation_fallback = True
-        filtered_cards = [card for card in cards if card["linked_language"] == PRIMARY_PUBLIC_LANG]
-        selected_language = PRIMARY_PUBLIC_LANG
-
-    event_options = Event.query.filter(Event.language == selected_language).order_by(Event.event_date.desc()).limit(100).all()
-    category_options = sorted({card["linked_category"] for card in cards if card["linked_category"]})
-
-    return render_template(
-        "media_gallery.html",
-        media_cards=filtered_cards,
-        event_options=event_options,
-        category_options=category_options,
-        translation_fallback=translation_fallback,
-    )
-
-
-@app.route("/sponsors")
-@app.route("/<lang>/sponsors")
-def sponsors_page(lang: str | None = None):
-    increment_analytics("sponsors", 0.5)
-    selected_type = request.args.get("type", "")
-    current_lang = get_public_lang(lang)
-
-    query, translation_fallback = apply_language_fallback(Sponsor.query, Sponsor, current_lang)
-    if selected_type:
-        query = query.filter(Sponsor.sponsor_type == selected_type)
-
-    sponsors = query.order_by(Sponsor.name.asc()).all()
-    sponsor_types = sorted({row.sponsor_type for row in sponsors})
-    return render_template("sponsors.html", sponsors=sponsors, sponsor_types=sponsor_types, translation_fallback=translation_fallback)
-
-
-@app.route("/guides")
-@app.route("/<lang>/guides")
-def guides_page(lang: str | None = None):
-    increment_analytics("guides", 0.5)
-    selected_type = request.args.get("type", "")
-    current_lang = get_public_lang(lang)
-
-    query, translation_fallback = apply_language_fallback(LocalGuide.query, LocalGuide, current_lang)
-    if selected_type:
-        query = query.filter(LocalGuide.guide_type == selected_type)
-
-    guides = query.order_by(LocalGuide.created_at.desc()).all()
-    guide_types = sorted({row.guide_type for row in guides})
-    return render_template("guides.html", guides=guides, guide_types=guide_types, translation_fallback=translation_fallback)
-
-
-@app.route("/faqs")
-@app.route("/<lang>/faqs")
-def faqs_page(lang: str | None = None):
-    increment_analytics("faqs", 0.5)
-    keyword = request.args.get("q", "").strip().lower()
-    current_lang = get_public_lang(lang)
-
-    query, translation_fallback = apply_language_fallback(FAQ.query, FAQ, current_lang)
-    if keyword:
-        query = query.filter(
-            db.or_(
-                FAQ.question.ilike(f"%{keyword}%"),
-                FAQ.answer.ilike(f"%{keyword}%"),
-            )
-        )
-
-    faqs = query.order_by(FAQ.created_at.desc()).all()
-    return render_template("faqs.html", faqs=faqs, translation_fallback=translation_fallback)
-
-
-@app.route("/about")
-@app.route("/<lang>/about")
-def about_page(lang: str | None = None):
-    increment_analytics("about", 0.4)
-    highlighted_regions = [
-        "Bujumbura waterfront venues",
-        "Gitega cultural centers",
-        "Ngozi youth and university hubs",
-    ]
-    return render_template("about.html", highlighted_regions=highlighted_regions)
-
-
-@app.route("/contact", methods=["GET", "POST"])
-@app.route("/<lang>/contact", methods=["GET", "POST"])
-def contact_page(lang: str | None = None):
-    increment_analytics("contact", 0.6)
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        phone = request.form.get("phone", "").strip()
-        message = request.form.get("message", "").strip()
-
-        if not name or not email or not message:
-            flash("Name, email, and message are required.", "danger")
-            return render_template("contact.html")
-
-        db.session.add(ContactMessage(name=name, email=email, phone=phone or None, message=message))
-        db.session.commit()
-
-        sent, feedback = send_contact_email(name, email, phone, message)
-        flash(feedback, "success" if sent else "warning")
-        return redirect(url_for("contact_page", lang=get_lang_segment(get_public_lang(lang))))
-
-    return render_template("contact.html")
-
-
-@app.route("/blog")
-@app.route("/<lang>/blog")
-def blog_home(lang: str | None = None):
-    increment_analytics("blog", 0.9)
-    keyword = request.args.get("keyword", "").strip().lower()
-    category_id = request.args.get("category", type=int)
-    page = request.args.get("page", 1, type=int)
-    per_page = 6
-    current_lang = get_public_lang(lang)
-
-    query, posts_fallback = apply_language_fallback(Post.query, Post, current_lang)
-    if keyword:
-        query = query.filter(Post.title.ilike(f"%{keyword}%"))
-    if category_id:
-        query = query.join(PostCategory, Post.id == PostCategory.post_id).filter(PostCategory.category_id == category_id)
-
-    posts = query.order_by(Post.published_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    post_cards = [build_post_card(post) for post in posts.items]
-    recent_posts = [build_post_card(post) for post in query.order_by(Post.published_at.desc()).limit(5).all()]
-    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
-    return render_template(
-        "blog.html",
-        posts=post_cards,
-        pagination=posts,
-        post_categories=post_categories,
-        recent_posts=recent_posts,
-        translation_fallback=posts_fallback,
-        seo=build_seo_meta(
-            title="Burundi Blog & News",
-            description="Read latest Burundi event updates, announcements, and community stories.",
-            language=current_lang,
-            keywords="Burundi blog, Burundi news, event announcements",
-        ),
-    )
-
-
-@app.route("/blog/<int:post_id>")
-@app.route("/<lang>/blog/<int:post_id>")
-@app.route("/blog/<slug>-<int:post_id>")
-@app.route("/<lang>/blog/<slug>-<int:post_id>")
-def blog_post_detail(post_id: int, lang: str | None = None, slug: str | None = None):
-    current_lang = get_public_lang(lang)
-    post = Post.query.get_or_404(post_id)
-    canonical_slug = post_slug(post)
-    if slug != canonical_slug:
-        return redirect(post_public_url(post, current_lang), code=301)
-    log_tracking_event(
-        content_type="post",
-        content_id=str(post.id),
-        title=post.title,
-        category=post.categories[0].name if post.categories else "General",
-    )
-    media_items = Media.query.filter_by(linked_type="post", linked_id=post.id).order_by(Media.uploaded_at.desc()).all()
-
-    related_query = Post.query.filter(Post.id != post.id, Post.language == post.language)
-    if post.categories:
-        category_ids = [category.id for category in post.categories]
-        related_query = related_query.join(PostCategory, Post.id == PostCategory.post_id).filter(
-            PostCategory.category_id.in_(category_ids)
-        )
-
-    related_posts = [build_post_card(item) for item in related_query.order_by(Post.published_at.desc()).limit(4).all()]
-    recent_posts = [build_post_card(item) for item in Post.query.filter(Post.language == post.language).order_by(Post.published_at.desc()).limit(5).all()]
-    post_categories = Category.query.filter_by(content_type="post").order_by(Category.name.asc()).all()
-    post_image = get_post_image(post.id)
-    image_url = url_for("static", filename=f"uploads/{post_image}", _external=True) if post_image else ""
-    post_url = post_public_url(post, current_lang, external=True)
-    structured_data = {
-        "@context": "https://schema.org",
-        "@type": "BlogPosting",
-        "headline": post.title,
-        "datePublished": post.published_at.isoformat(),
-        "dateModified": post.published_at.isoformat(),
-        "description": (post.seo_description or post.body)[:160],
-        "url": post_url,
-    }
-    return render_template(
-        "blog_detail.html",
-        post=post,
-        media_items=media_items,
-        related_posts=related_posts,
-        recent_posts=recent_posts,
-        post_categories=post_categories,
-        translation_fallback=(post.language != current_lang and post.language == PRIMARY_PUBLIC_LANG),
-        seo=build_seo_meta(
-            title=post.seo_title or post.title,
-            description=post.seo_description or post.body,
-            language=post.language,
-            keywords=post.seo_keywords or post.tags,
-            image_url=image_url,
-            url=post_url,
-            content_type="article",
-        ),
-        structured_data=structured_data,
-    )
-
-
-@app.route("/admin/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     increment_analytics("login", 0.2)
     if request.method == "POST":
@@ -1218,11 +294,10 @@ def login():
 def logout():
     session.pop("admin_user", None)
     flash("You have been logged out.", "info")
-    active_lang = get_public_lang()
-    return redirect(url_for("home", lang=get_lang_segment(active_lang)))
+    return redirect(url_for("login"))
 
 
-@app.route("/admin/dashboard")
+@app.route("/dashboard")
 @login_required
 def dashboard():
     increment_analytics("dashboard", 1.0)
@@ -1236,7 +311,7 @@ def dashboard():
     return render_template("dashboard.html", stats=stats, top_pages=top_pages)
 
 
-@app.route("/admin/events")
+@app.route("/events")
 @login_required
 def events_list():
     increment_analytics("events", 0.8)
@@ -1262,7 +337,7 @@ def events_list():
     return render_template("events.html", events=events, event_categories=event_categories)
 
 
-@app.route("/admin/events/add", methods=["GET", "POST"])
+@app.route("/events/add", methods=["GET", "POST"])
 @login_required
 def add_event():
     categories = Category.query.filter_by(content_type="event").all()
@@ -1271,11 +346,6 @@ def add_event():
         description = request.form.get("description", "").strip()
         date_str = request.form.get("event_date", "")
         language = request.form.get("language", "en")
-        location = request.form.get("location", "").strip() or "TBD"
-        tags = request.form.get("tags", "").strip()
-        seo_title = request.form.get("seo_title", "").strip()
-        seo_description = request.form.get("seo_description", "").strip()
-        seo_keywords = request.form.get("seo_keywords", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not description or not date_str:
@@ -1287,11 +357,6 @@ def add_event():
             description=description,
             event_date=datetime.strptime(date_str, "%Y-%m-%dT%H:%M"),
             language=language,
-            location=location,
-            tags=tags,
-            seo_title=seo_title or title,
-            seo_description=seo_description or description[:160],
-            seo_keywords=seo_keywords or tags,
         )
 
         for cid in selected_ids:
@@ -1307,7 +372,7 @@ def add_event():
     return render_template("event_form.html", categories=categories, event=None)
 
 
-@app.route("/admin/events/<int:event_id>/edit", methods=["GET", "POST"])
+@app.route("/events/<int:event_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_event(event_id: int):
     event = Event.query.get_or_404(event_id)
@@ -1316,11 +381,6 @@ def edit_event(event_id: int):
         event.title = request.form.get("title", event.title)
         event.description = request.form.get("description", event.description)
         event.language = request.form.get("language", event.language)
-        event.location = request.form.get("location", event.location)
-        event.tags = request.form.get("tags", event.tags)
-        event.seo_title = request.form.get("seo_title", event.seo_title) or event.title
-        event.seo_description = request.form.get("seo_description", event.seo_description) or (event.description or "")[:160]
-        event.seo_keywords = request.form.get("seo_keywords", event.seo_keywords) or event.tags
         date_str = request.form.get("event_date", "")
         if date_str:
             event.event_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
@@ -1337,7 +397,7 @@ def edit_event(event_id: int):
     return render_template("event_form.html", event=event, categories=categories)
 
 
-@app.route("/admin/events/<int:event_id>/delete", methods=["POST"])
+@app.route("/events/<int:event_id>/delete", methods=["POST"])
 @login_required
 def delete_event(event_id: int):
     event = Event.query.get_or_404(event_id)
@@ -1347,7 +407,7 @@ def delete_event(event_id: int):
     return redirect(url_for("events_list"))
 
 
-@app.route("/admin/posts")
+@app.route("/posts")
 @login_required
 def posts_list():
     increment_analytics("posts", 0.8)
@@ -1373,7 +433,7 @@ def posts_list():
     return render_template("posts.html", posts=posts, post_categories=post_categories)
 
 
-@app.route("/admin/posts/add", methods=["GET", "POST"])
+@app.route("/posts/add", methods=["GET", "POST"])
 @login_required
 def add_post():
     categories = Category.query.filter_by(content_type="post").all()
@@ -1381,11 +441,6 @@ def add_post():
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
         published_at = request.form.get("published_at", "")
-        language = request.form.get("language", "fr")
-        tags = request.form.get("tags", "").strip()
-        seo_title = request.form.get("seo_title", "").strip()
-        seo_description = request.form.get("seo_description", "").strip()
-        seo_keywords = request.form.get("seo_keywords", "").strip()
         selected_ids = request.form.getlist("categories")
 
         if not title or not body:
@@ -1395,11 +450,6 @@ def add_post():
         post = Post(
             title=title,
             body=body,
-            language=language,
-            tags=tags,
-            seo_title=seo_title or title,
-            seo_description=seo_description or body[:160],
-            seo_keywords=seo_keywords or tags,
             published_at=datetime.strptime(published_at, "%Y-%m-%dT%H:%M") if published_at else datetime.utcnow(),
         )
 
@@ -1416,7 +466,7 @@ def add_post():
     return render_template("post_form.html", categories=categories, post=None)
 
 
-@app.route("/admin/posts/<int:post_id>/edit", methods=["GET", "POST"])
+@app.route("/posts/<int:post_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_post(post_id: int):
     post = Post.query.get_or_404(post_id)
@@ -1424,11 +474,6 @@ def edit_post(post_id: int):
     if request.method == "POST":
         post.title = request.form.get("title", post.title)
         post.body = request.form.get("body", post.body)
-        post.language = request.form.get("language", post.language)
-        post.tags = request.form.get("tags", post.tags)
-        post.seo_title = request.form.get("seo_title", post.seo_title) or post.title
-        post.seo_description = request.form.get("seo_description", post.seo_description) or (post.body or "")[:160]
-        post.seo_keywords = request.form.get("seo_keywords", post.seo_keywords) or post.tags
         published_at = request.form.get("published_at", "")
         if published_at:
             post.published_at = datetime.strptime(published_at, "%Y-%m-%dT%H:%M")
@@ -1445,7 +490,7 @@ def edit_post(post_id: int):
     return render_template("post_form.html", categories=categories, post=post)
 
 
-@app.route("/admin/posts/<int:post_id>/delete", methods=["POST"])
+@app.route("/posts/<int:post_id>/delete", methods=["POST"])
 @login_required
 def delete_post(post_id: int):
     post = Post.query.get_or_404(post_id)
@@ -1455,14 +500,7 @@ def delete_post(post_id: int):
     return redirect(url_for("posts_list"))
 
 
-@app.route("/admin/messages")
-@login_required
-def admin_messages():
-    messages = ContactMessage.query.order_by(ContactMessage.created_at.desc()).all()
-    return render_template("messages.html", messages=messages)
-
-
-@app.route("/admin/categories", methods=["GET", "POST"])
+@app.route("/categories", methods=["GET", "POST"])
 @login_required
 def manage_categories():
     if request.method == "POST":
@@ -1479,7 +517,7 @@ def manage_categories():
     return render_template("categories.html", categories=categories)
 
 
-@app.route("/admin/categories/<int:category_id>/delete", methods=["POST"])
+@app.route("/categories/<int:category_id>/delete", methods=["POST"])
 @login_required
 def delete_category(category_id: int):
     category = Category.query.get_or_404(category_id)
@@ -1489,7 +527,7 @@ def delete_category(category_id: int):
     return redirect(url_for("manage_categories"))
 
 
-@app.route("/admin/media", methods=["GET", "POST"])
+@app.route("/media", methods=["GET", "POST"])
 @login_required
 def media_library():
     increment_analytics("media", 0.6)
@@ -1526,7 +564,7 @@ def media_library():
     return render_template("media.html", media_items=media_items)
 
 
-@app.route("/admin/media/<int:media_id>/delete", methods=["POST"])
+@app.route("/media/<int:media_id>/delete", methods=["POST"])
 @login_required
 def delete_media(media_id: int):
     media = Media.query.get_or_404(media_id)
@@ -1539,129 +577,19 @@ def delete_media(media_id: int):
     return redirect(url_for("media_library"))
 
 
-@app.route("/admin/analytics")
+@app.route("/analytics")
 @login_required
 def analytics():
-    date_from = request.args.get("date_from", "")
-    date_to = request.args.get("date_to", "")
-    content_type = request.args.get("content_type", "")
-    category = request.args.get("category", "")
-
-    query = TrackingEvent.query.filter_by(interaction="view")
-    if content_type in {"page", "event", "post", "media"}:
-        query = query.filter(TrackingEvent.content_type == content_type)
-    if category:
-        query = query.filter(TrackingEvent.category == category)
-    if date_from:
-        query = query.filter(func.date(TrackingEvent.created_at) >= date_from)
-    if date_to:
-        query = query.filter(func.date(TrackingEvent.created_at) <= date_to)
-
     rows = Analytics.query.order_by(Analytics.views.desc()).all()
     labels = [row.page for row in rows]
     view_values = [row.views for row in rows]
     popularity_values = [row.popularity_score for row in rows]
-
-    total_page_views = query.count()
-    unique_visitors = query.with_entities(TrackingEvent.visitor_id).distinct().count()
-
-    event_performance = (
-        query.filter(TrackingEvent.content_type == "event")
-        .with_entities(
-            TrackingEvent.content_id,
-            TrackingEvent.content_title,
-            TrackingEvent.category,
-            func.count(TrackingEvent.id).label("views"),
-        )
-        .group_by(TrackingEvent.content_id, TrackingEvent.content_title, TrackingEvent.category)
-        .order_by(func.count(TrackingEvent.id).desc())
-        .all()
-    )
-
-    post_performance = (
-        query.filter(TrackingEvent.content_type == "post")
-        .with_entities(
-            TrackingEvent.content_id,
-            TrackingEvent.content_title,
-            TrackingEvent.category,
-            func.count(TrackingEvent.id).label("views"),
-        )
-        .group_by(TrackingEvent.content_id, TrackingEvent.content_title, TrackingEvent.category)
-        .order_by(func.count(TrackingEvent.id).desc())
-        .all()
-    )
-
-    traffic_daily = (
-        query.with_entities(func.date(TrackingEvent.created_at).label("day"), func.count(TrackingEvent.id).label("count"))
-        .group_by(func.date(TrackingEvent.created_at))
-        .order_by(func.date(TrackingEvent.created_at).asc())
-        .all()
-    )
-    traffic_labels = [str(item.day) for item in traffic_daily]
-    traffic_values = [item.count for item in traffic_daily]
-
-    referrers = (
-        query.with_entities(TrackingEvent.referrer_domain, func.count(TrackingEvent.id).label("count"))
-        .group_by(TrackingEvent.referrer_domain)
-        .order_by(func.count(TrackingEvent.id).desc())
-        .limit(8)
-        .all()
-    )
-
-    categories = sorted(
-        {
-            category_name
-            for category_name, in db.session.query(TrackingEvent.category)
-            .filter(TrackingEvent.category.isnot(None), TrackingEvent.category != "")
-            .distinct()
-            .all()
-        }
-    )
-
     return render_template(
         "analytics.html",
         rows=rows,
         labels=labels,
         view_values=view_values,
         popularity_values=popularity_values,
-        total_page_views=total_page_views,
-        unique_visitors=unique_visitors,
-        top_events=event_performance[:5],
-        top_posts=post_performance[:5],
-        event_performance=event_performance,
-        post_performance=post_performance,
-        traffic_labels=traffic_labels,
-        traffic_values=traffic_values,
-        referrers=referrers,
-        categories=categories,
-    )
-
-
-@app.route("/admin/analytics/export")
-@login_required
-def analytics_export():
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["content_type", "content_id", "title", "category", "interaction", "referrer", "created_at"])
-
-    events = TrackingEvent.query.order_by(TrackingEvent.created_at.desc()).all()
-    for item in events:
-        writer.writerow(
-            [
-                item.content_type,
-                item.content_id,
-                item.content_title or "",
-                item.category or "",
-                item.interaction,
-                item.referrer_domain or "",
-                item.created_at.isoformat(),
-            ]
-        )
-
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=analytics_report.csv"},
     )
 
 
