@@ -1,0 +1,76 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<section class="hero" style="background-image: url('{{ url_for('static', filename='uploads/' + featured_event.image) if featured_event and featured_event.image else '' }}');">
+  <div class="hero-overlay">
+    <h1>{{ featured_event.title if featured_event else 'Discover upcoming local events in Burundi' }}</h1>
+    <p>Discover upcoming local events in Burundi.</p>
+    <a class="btn" href="#events-grid">View Events</a>
+  </div>
+</section>
+
+<section class="search-panel" id="events-grid">
+  <h2>Upcoming Events</h2>
+  <div class="filters">
+    <input id="event-search" type="text" placeholder="Search by keyword">
+    <select id="event-category-filter">
+      <option value="">All categories</option>
+      {% for category in categories %}
+      <option value="{{ category.id }}">{{ category.name }}</option>
+      {% endfor %}
+    </select>
+    <select id="event-sort">
+      <option value="asc">Date: Soonest first</option>
+      <option value="desc">Date: Latest first</option>
+    </select>
+  </div>
+
+  <div class="event-grid" id="event-grid">
+    {% for card in event_cards %}
+    <a href="{{ url_for('event_detail', event_id=card.id, slug=card.slug, lang=current_public_lang_segment) }}" class="event-card" data-title="{{ card.title|lower }}" data-category="{{ card.category_id }}" data-date="{{ card.date }}">
+      {% if card.image %}
+      <img src="{{ url_for('static', filename='uploads/' + card.image) }}" alt="{{ card.title }}">
+      {% else %}
+      <div class="image-placeholder">No image</div>
+      {% endif %}
+      <div class="event-card-body">
+        <span class="badge">{{ card.category }}</span>
+        <h3>{{ card.title }}</h3>
+        <p>{{ card.date }} · {{ card.time }}<br>{{ card.location }}</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="pagination">
+    {% if pagination.has_prev %}<a href="{{ url_for('home', lang=current_public_lang_segment, page=pagination.prev_num) }}">Previous</a>{% endif %}
+    <span>Page {{ pagination.page }} / {{ pagination.pages or 1 }}</span>
+    {% if pagination.has_next %}<a href="{{ url_for('home', lang=current_public_lang_segment, page=pagination.next_num) }}">Next</a>{% endif %}
+  </div>
+</section>
+
+<section id="blog-highlights">
+  <h2>Latest Blog Highlights</h2>
+  <div class="blog-grid">
+    {% for post in blog_highlights %}
+    <article class="card">
+      <h3>{{ post.title }}</h3>
+      <p>{{ post.published }}</p>
+      <p>{{ post.excerpt }}</p>
+    </article>
+    {% else %}
+    <p>No blog posts yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="media" class="card">
+  <h2>Media</h2>
+  <p>Explore highlights from community events and featured moments.</p>
+  <a class="btn" href="{{ url_for('media_gallery', lang=current_public_lang_segment) }}">Open Gallery</a>
+</section>
+
+<section id="about" class="card">
+  <h2>About</h2>
+  <p>We connect people to local events across Burundi through a simple multilingual platform.</p>
+</section>
+{% endblock %}
